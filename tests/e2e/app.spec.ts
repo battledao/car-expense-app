@@ -14,3 +14,25 @@ test('can navigate all primary modules and create a vehicle', async ({ page }) =
   await page.getByRole('button', { name: '保存记录' }).click()
   await expect(page.getByText('共 1 笔，合计 ¥20.00')).toBeVisible()
 })
+
+test('sorts detailed records by date ascending by default and can switch to descending', async ({ page }) => {
+  await page.goto('/vehicles')
+  await page.getByRole('button', { name: '新增车辆' }).click()
+  await page.getByLabel('车辆名称').fill('排序测试车')
+  await page.getByLabel('初始里程（km）').fill('0')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+
+  await page.getByRole('button', { name: '＋记一笔' }).click()
+  await page.getByLabel('金额（元）').fill('10')
+  await page.getByLabel('发生时间').fill('2026-01-02T12:00')
+  await page.getByRole('button', { name: '保存记录' }).click()
+
+  await page.getByRole('button', { name: '＋记一笔' }).click()
+  await page.getByLabel('金额（元）').fill('20')
+  await page.getByLabel('发生时间').fill('2026-01-01T12:00')
+  await page.getByRole('button', { name: '保存记录' }).click()
+
+  await expect(page.locator('tbody tr').first()).toContainText('2026年1月1日')
+  await page.getByLabel('排序').selectOption('date-desc')
+  await expect(page.locator('tbody tr').first()).toContainText('2026年1月2日')
+})
