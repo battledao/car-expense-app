@@ -35,4 +35,12 @@ test('sorts detailed records by date ascending by default and can switch to desc
   await expect(page.locator('tbody tr').first()).toContainText('2026年1月1日')
   await page.getByLabel('排序').selectOption('date-desc')
   await expect(page.locator('tbody tr').first()).toContainText('2026年1月2日')
+
+  await page.getByLabel('最低金额').fill('15')
+  await expect(page.locator('tbody tr')).toHaveCount(1)
+  await page.getByRole('button', { name: '清除筛选' }).click()
+  await expect(page.getByLabel('最低金额')).toHaveValue('')
+  await expect(page.getByLabel('排序')).toHaveValue('date-asc')
+  await expect(page.locator('tbody tr')).toHaveCount(2)
+  await expect(page.locator('tbody tr').first()).toContainText('2026年1月1日')
 })
