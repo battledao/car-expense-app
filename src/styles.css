@@ -6,8 +6,9 @@ button, select { font: inherit; }
 aside { padding: 24px 16px; background: #123d37; color: white; }
 aside h1 { font-size: 20px; margin: 0 0 28px; }
 nav { display: grid; gap: 6px; }
-nav a { color: #d6e4df; padding: 10px 12px; border-radius: 8px; text-decoration: none; }
+nav a { color: #d6e4df; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; text-decoration: none; }
 nav a.active, nav a:hover { color: white; background: #28685e; }
+.nav-icon { width: 18px; text-align: center; font-size: 18px; line-height: 1; }
 main { min-width: 0; }
 header { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 12px 28px; background: white; border-bottom: 1px solid #dde4e2; }
 header span { margin-left: auto; color: #60706c; font-size: 13px; }
