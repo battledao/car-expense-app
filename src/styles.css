@@ -1,0 +1,33 @@
+:root { font-family: system-ui, sans-serif; color: #16202a; background: #f5f7f8; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, select { font: inherit; }
+.app-shell { min-height: 100vh; display: grid; grid-template-columns: 220px 1fr; }
+aside { padding: 24px 16px; background: #123d37; color: white; }
+aside h1 { font-size: 20px; margin: 0 0 28px; }
+nav { display: grid; gap: 6px; }
+nav a { color: #d6e4df; padding: 10px 12px; border-radius: 8px; text-decoration: none; }
+nav a.active, nav a:hover { color: white; background: #28685e; }
+main { min-width: 0; }
+header { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 12px 28px; background: white; border-bottom: 1px solid #dde4e2; }
+header span { margin-left: auto; color: #60706c; font-size: 13px; }
+section { padding: 32px; }
+section h2 { margin-top: 0; }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 20px 0; }
+.metric, .panel { background: white; border: 1px solid #dde4e2; border-radius: 10px; padding: 16px; }
+.metric span, .muted, small { color: #60706c; font-size: 13px; }
+.metric strong { display: block; margin-top: 8px; font-size: 20px; }
+.grid-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.panel { margin: 16px 0; } .panel h3 { margin-top: 0; }
+.simple-list { list-style: none; padding: 0; margin: 0; } .simple-list li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid #edf0ef; }
+.form { display: grid; gap: 16px; max-width: 900px; margin-top: 20px; } .field { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+label { display: grid; gap: 6px; font-size: 14px; } input, select, textarea, button { padding: 8px 10px; border: 1px solid #bdc9c5; border-radius: 7px; background: white; } textarea { min-height: 76px; resize: vertical; } button { cursor: pointer; } button:hover { background: #edf5f2; } .check { display: flex; align-items: center; margin-top: 24px; } .check input { width: auto; }
+.error { color: #a41d2d; margin: 0; } .filters, .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0; }
+table { width: 100%; border-collapse: collapse; background: white; } th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e3e8e6; } td button { margin-right: 5px; padding: 5px 7px; }
+.drawer { position: fixed; z-index: 2; top: 0; right: 0; width: min(680px, 95vw); height: 100vh; overflow: auto; padding: 24px; background: white; box-shadow: -8px 0 24px #0003; }
+.calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; max-width: 900px; } .calendar strong { text-align: center; } .calendar button { min-height: 72px; text-align: left; display: grid; align-content: space-between; } .calendar button.selected { outline: 3px solid #28685e; } .calendar small { color: #28685e; }
+.bars { display: grid; gap: 10px; } .bars > div { display: grid; grid-template-columns: 72px 1fr 90px; align-items: center; gap: 8px; } .bars i { display: block; height: 12px; background: #3a8a7c; border-radius: 4px; }
+.big-number { font-size: 24px; font-weight: 700; } .vehicle-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; } .vehicle-list .panel { margin: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+@media (max-width: 760px) { .app-shell { grid-template-columns: 1fr; } aside { padding: 12px; } nav { grid-template-columns: repeat(2, 1fr); } header { padding: 12px; } section { padding: 20px; } }
+@media (max-width: 900px) { .metrics, .grid-two { grid-template-columns: 1fr 1fr; } }
