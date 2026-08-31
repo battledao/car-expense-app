@@ -32,3 +32,32 @@ table { width: 100%; border-collapse: collapse; background: white; } th, td { te
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 @media (max-width: 760px) { .app-shell { grid-template-columns: 1fr; } aside { padding: 12px; } nav { grid-template-columns: repeat(2, 1fr); } header { padding: 12px; } section { padding: 20px; } }
 @media (max-width: 900px) { .metrics, .grid-two { grid-template-columns: 1fr 1fr; } }
+.energy-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.energy-heading h2 { margin-bottom: 6px; }
+.energy-actions { display: flex; gap: 8px; }
+.energy-actions a { color: #174f47; background: white; border: 1px solid #9eb6b0; border-radius: 7px; padding: 8px 12px; text-decoration: none; }
+.energy-metric-group > h3 { margin: 24px 0 10px; }
+.energy-metrics { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-top: 0; }
+.quality-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.quality-block p { margin: 8px 0; }.energy-charts { align-items: stretch; margin-top: 20px; }
+.energy-charts .panel { margin: 0; min-width: 0; }
+.energy-chart { width: 100%; min-height: 220px; }
+.chart-tooltip { background: white; border: 1px solid #bdc9c5; border-radius: 7px; padding: 10px; box-shadow: 0 5px 18px #0002; }
+.chart-tooltip p { margin: 4px 0; }
+.trend-points { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.trend-points button { color: #174f47; padding: 6px 8px; }.table-scroll { overflow-x: auto; }
+.energy-page .table-scroll table { min-width: 980px; }
+.interval-basis { margin-top: 16px; padding: 14px; border-left: 4px solid #28685e; background: #f4faf8; }
+.interval-basis h4 { margin: 0 0 8px; }
+.interval-basis p { margin: 8px 0; }
+.interval-basis ul { margin-bottom: 8px; }
+.link-button { padding: 0; border: 0; color: #174f47; background: transparent; text-decoration: underline; }
+.link-button:hover { background: transparent; }
+@media (max-width: 600px) {
+  header { flex-wrap: wrap; }
+  header span { width: 100%; margin-left: 0; }
+  .metrics, .grid-two { grid-template-columns: 1fr; }
+  .energy-heading { flex-direction: column; }
+  .energy-actions { flex-wrap: wrap; }
+  .energy-page .toolbar > label { flex: 1 1 160px; }
+}
