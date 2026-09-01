@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { averageEnergy, byCategory, costPerKm, energyDateRange, energyIntervals, energyQuality, energySummary, energyUnitPriceCents, filterEnergyIntervals, filterRecords, hybridEnergyCost, totalCents } from './calculations'
+import { averageEnergy, byCategory, costPerKm, energyDateRange, energyIntervals, energyQuality, energySummary, energyUnitPriceCents, filterEnergyIntervals, filterRecords, hybridEnergyCost, monthSummary, monthlyCostPerKm, monthlyTrend, totalCents } from './calculations'
 import type { ExpenseRecord, Vehicle } from './models'
 
 const vehicle: Vehicle = { id: 'v1', name: '车', energyType: 'fuel', initialMileage: 1000, isDefault: true, createdAt: '', updatedAt: '' }
@@ -19,6 +19,21 @@ describe('calculations', () => {
     expect(costPerKm(vehicle, [record('a', { mileage: 1100 })])).toBeUndefined()
   })
 
+  it('builds dashboard month summaries and avoids misleading monthly per-kilometre costs', () => {
+    const records = [
+      record('july', { occurredAt: '2026-07-15T10:00', amountCents: 3000, mileage: 1100 }),
+      record('aug-a', { occurredAt: '2026-08-02T10:00', amountCents: 2000, mileage: 1200 }),
+      record('aug-b', { occurredAt: '2026-08-20T10:00', amountCents: 5000, mileage: 1400 }),
+    ]
+    expect(monthSummary(records, '2026-08')).toMatchObject({ totalCents: 7000, count: 2, averageCents: 3500, changePercent: 133.333 })
+    expect(monthlyTrend(records, '2026-08', 3)).toEqual([
+      { month: '2026-06', totalCents: 0 },
+      { month: '2026-07', totalCents: 3000 },
+      { month: '2026-08', totalCents: 7000 },
+    ])
+    expect(monthlyCostPerKm(records, '2026-08')).toEqual({ costCents: 7000, distance: 200, costPerKm: 35 })
+    expect(monthlyCostPerKm([records[1]], '2026-08')).toEqual({ reason: '至少需要两条含里程记录。' })
+  })
   it('builds a full-to-full fuel interval and accumulates partial refuels', () => {
     const records = [
       record('a', { category: 'fuel', occurredAt: '2026-08-01T10:00', mileage: 1000, fuelLiters: 50, amountCents: 25000, isFullFuel: true }),
