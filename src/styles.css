@@ -53,6 +53,12 @@ table { width: 100%; border-collapse: collapse; background: white; } th, td { te
 .interval-basis ul { margin-bottom: 8px; }
 .link-button { padding: 0; border: 0; color: #174f47; background: transparent; text-decoration: underline; }
 .link-button:hover { background: transparent; }
+.dashboard-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.dashboard-heading h2 { margin-bottom: 6px; }
+.dashboard-heading .toolbar { margin: 0; }
+.dashboard-heading .toolbar a { color: #174f47; background: white; border: 1px solid #9eb6b0; border-radius: 7px; padding: 8px 10px; text-decoration: none; }
+.record-row { width: 100%; display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; border: 0; text-align: left; }
+.record-row:hover { background: transparent; color: #174f47; }
 @media (max-width: 600px) {
   header { flex-wrap: wrap; }
   header span { width: 100%; margin-left: 0; }
@@ -60,4 +66,6 @@ table { width: 100%; border-collapse: collapse; background: white; } th, td { te
   .energy-heading { flex-direction: column; }
   .energy-actions { flex-wrap: wrap; }
   .energy-page .toolbar > label { flex: 1 1 160px; }
+  .dashboard-heading { flex-direction: column; }
+  .dashboard-heading .toolbar { width: 100%; }
 }

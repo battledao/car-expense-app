@@ -1,0 +1,35 @@
+import { expect, test } from '@playwright/test'
+
+test('filters dashboard records by month and keeps the filter in detailed records', async ({ page }) => {
+  await page.goto('/vehicles')
+  await page.getByRole('button', { name: '新增车辆' }).click()
+  await page.getByLabel('车辆名称').fill('首页验收车')
+  await page.getByLabel('初始里程（km）').fill('0')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+  await page.getByRole('button', { name: '＋记一笔' }).click()
+  await page.getByLabel('金额（元）').fill('25')
+  await page.getByLabel('发生时间').fill('2026-08-15T12:00')
+  await page.getByRole('button', { name: '保存记录' }).click()
+  await page.getByRole('link', { name: '首页总览' }).click()
+  await page.getByLabel('首页月份').fill('2026-08')
+
+  await expect(page.getByRole('img', { name: '近六个月费用趋势图' })).toBeVisible()
+  await expect(page.locator('.metric').filter({ hasText: '本月费用' })).toContainText('¥25.00')
+  await page.getByRole('link', { name: '查看本月记录' }).click()
+  await expect(page.getByLabel('开始日期')).toHaveValue('2026-08-01')
+  await expect(page.getByLabel('结束日期')).toHaveValue('2026-08-31')
+  await expect(page.getByText('共 1 笔，合计 ¥25.00')).toBeVisible()
+})
+
+test('keeps the dashboard controls usable on a narrow screen', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: '首页总览' })).toBeVisible()
+  await page.getByRole('link', { name: '新增第一辆车' }).click()
+  await page.getByRole('button', { name: '新增车辆' }).click()
+  await page.getByLabel('车辆名称').fill('窄屏验收车')
+  await page.getByLabel('初始里程（km）').fill('0')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+  await page.getByRole('link', { name: '首页总览' }).click()
+  await expect(page.getByLabel('首页月份')).toBeVisible()
+})

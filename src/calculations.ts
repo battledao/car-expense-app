@@ -20,6 +20,31 @@ export const byCategory = (records: ExpenseRecord[]) => Object.entries(records.r
 export const monthKey = (value: string) => value.slice(0, 7)
 export const byMonth = (records: ExpenseRecord[]) => Object.entries(records.reduce<Record<string, number>>((all, record) => ({ ...all, [monthKey(record.occurredAt)]: (all[monthKey(record.occurredAt)] ?? 0) + record.amountCents }), {})).sort(([a], [b]) => a.localeCompare(b))
 
+const shiftMonth = (value: string, offset: number) => {
+  const date = new Date(`${value}-01T00:00`)
+  date.setMonth(date.getMonth() + offset)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+export function monthSummary(records: ExpenseRecord[], selectedMonth: string) {
+  const current = records.filter(record => monthKey(record.occurredAt) === selectedMonth)
+  const currentCents = totalCents(current), previousCents = totalCents(records.filter(record => monthKey(record.occurredAt) === shiftMonth(selectedMonth, -1)))
+  return { totalCents: currentCents, count: current.length, averageCents: current.length ? currentCents / current.length : undefined, changePercent: previousCents ? Math.round((currentCents - previousCents) / previousCents * 100000) / 1000 : undefined }
+}
+export function monthlyTrend(records: ExpenseRecord[], selectedMonth: string, months = 6) {
+  return Array.from({ length: months }, (_, index) => {
+    const month = shiftMonth(selectedMonth, index - months + 1)
+    return { month, totalCents: totalCents(records.filter(record => monthKey(record.occurredAt) === month)) }
+  })
+}
+export function monthlyCostPerKm(records: ExpenseRecord[], selectedMonth: string) {
+  const inMonth = records.filter(record => monthKey(record.occurredAt) === selectedMonth)
+  const mileageRecords = inMonth.filter(record => record.mileage !== undefined).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
+  if (mileageRecords.length < 2) return { reason: '至少需要两条含里程记录。' }
+  if (mileageRecords.some((record, index) => index && record.mileage! <= mileageRecords[index - 1].mileage!)) return { reason: '里程需要严格递增。' }
+  const distance = mileageRecords.at(-1)!.mileage! - mileageRecords[0].mileage!
+  const costCents = totalCents(inMonth)
+  return { costCents, distance, costPerKm: costCents / distance }
+}
 export const highestMileage = (vehicle: Vehicle, records: ExpenseRecord[]) => Math.max(vehicle.initialMileage, ...records.filter(record => record.mileage !== undefined).map(record => record.mileage!))
 export function costPerKm(vehicle: Vehicle, records: ExpenseRecord[]) {
   const mileages = records.flatMap(record => record.mileage === undefined ? [] : [record.mileage])
