@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import App from './App'
 import { db } from './db'
 import type { ExpenseCategory } from './models'
@@ -97,6 +97,88 @@ it('shows a first-use dashboard action when there are no vehicles', () => {
   render(<MemoryRouter><App /></MemoryRouter>)
   expect(screen.getByText('先添加一辆车，开始记录用车费用。')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: '新增第一辆车' })).toHaveAttribute('href', '/vehicles')
+})
+
+it('groups record scenes by vehicle type and shows the current mileage as a reference', async () => {
+  await db.saveVehicle({ id: 'fuel', name: '燃油记账车', energyType: 'fuel', initialMileage: 800, isDefault: true })
+  await db.saveRecord({ id: 'old', vehicleId: 'fuel', category: 'parking', amountCents: 1000, occurredAt: '2026-08-01T10:00', mileage: 1000, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter initialEntries={['/record']}><App /></MemoryRouter>)
+
+  await waitFor(() => expect(screen.getByLabelText('所属车辆')).toHaveValue('fuel'))
+  expect(screen.getByText(/最高里程参考：1000 km/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '加油' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '充电' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '停车' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(screen.getByRole('button', { name: '加油' }))
+  expect(screen.getByLabelText('加油量（升）')).toBeInTheDocument()
+  expect(screen.queryByLabelText('充电量（kWh）')).not.toBeInTheDocument()
+})
+
+it('guides the user to add a vehicle instead of showing an unusable record form', () => {
+  render(<MemoryRouter initialEntries={['/record']}><App /></MemoryRouter>)
+  expect(screen.getByText('请先新增车辆后再记账。')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: '新增车辆' })).toHaveAttribute('href', '/vehicles')
+  expect(screen.queryByLabelText('金额（元）')).not.toBeInTheDocument()
+})
+
+it('calculates energy amount and unit price from the last edited field', async () => {
+  await db.saveVehicle({ id: 'hybrid', name: '插混记账车', energyType: 'hybrid', initialMileage: 0, isDefault: true })
+  render(<MemoryRouter initialEntries={['/record']}><App /></MemoryRouter>)
+
+  fireEvent.click(await screen.findByRole('button', { name: '加油' }))
+  fireEvent.change(screen.getByLabelText('加油量（升）'), { target: { value: '10' } })
+  fireEvent.change(screen.getByLabelText('单价（元/升）'), { target: { value: '7.23' } })
+  expect(screen.getByLabelText('金额（元）')).toHaveValue(72.3)
+  fireEvent.change(screen.getByLabelText('金额（元）'), { target: { value: '80' } })
+  expect(screen.getByLabelText('单价（元/升）')).toHaveValue(8)
+
+  fireEvent.click(screen.getByRole('button', { name: '充电' }))
+  expect(screen.getByLabelText('充电方式')).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('充电方式'), { target: { value: '公共直流快充' } })
+  expect(screen.getByLabelText('充电方式')).toHaveValue('公共直流快充')
+  expect(screen.getByText(/未充满记录仍可参与完整区间内的累计/)).toBeInTheDocument()
+})
+
+it('shows field-level validation and focuses the first invalid input', async () => {
+  await db.saveVehicle({ id: 'fuel', name: '校验车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  render(<MemoryRouter initialEntries={['/record']}><App /></MemoryRouter>)
+
+  await waitFor(() => expect(screen.getByLabelText('所属车辆')).toHaveValue('fuel'))
+  const form = (await screen.findByLabelText('金额（元）')).closest('form')!
+  fireEvent.submit(form)
+  expect(screen.getByText('金额必须大于 0。')).toBeInTheDocument()
+  const amountInput = screen.getByRole('spinbutton', { name: /金额（元）/ })
+  expect(amountInput).toHaveFocus()
+  expect(amountInput).toHaveAttribute('aria-invalid', 'true')
+})
+
+it('keeps the vehicle and category when saving another record and preserves input on failure', async () => {
+  await db.saveVehicle({ id: 'fuel', name: '连续记账车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  render(<MemoryRouter initialEntries={['/record']}><App /></MemoryRouter>)
+
+  fireEvent.change(await screen.findByLabelText('金额（元）'), { target: { value: '20' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存并再记一笔' }))
+  await waitFor(() => expect(screen.getByText('保存成功，可以继续记账。')).toBeInTheDocument())
+  expect(screen.getByLabelText('所属车辆')).toHaveValue('fuel')
+  expect(screen.getByRole('button', { name: '停车' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByLabelText('金额（元）')).toHaveValue(null)
+
+  const failure = vi.spyOn(db, 'saveRecord').mockRejectedValueOnce(new Error('写入失败'))
+  fireEvent.change(screen.getByLabelText('金额（元）'), { target: { value: '30' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存并查看记录' }))
+  await waitFor(() => expect(screen.getByText('保存失败，请检查本地数据后重试。')).toBeInTheDocument())
+  expect(screen.getByLabelText('金额（元）')).toHaveValue(30)
+  failure.mockRestore()
+})
+
+it('applies valid vehicle, category and date parameters when entering the record page', async () => {
+  await db.saveVehicle({ id: 'default', name: '默认车辆', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveVehicle({ id: 'hybrid', name: '参数插混车', energyType: 'hybrid', initialMileage: 0 })
+  render(<MemoryRouter initialEntries={['/record?vehicle=hybrid&category=charge&date=2026-08-10']}><App /></MemoryRouter>)
+
+  await waitFor(() => expect(screen.getByLabelText('所属车辆')).toHaveValue('hybrid'))
+  expect(screen.getByRole('button', { name: '充电' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByLabelText('发生时间')).toHaveValue('2026-08-10T12:00')
 })
 it('provides vehicle-aware energy controls and a twelve-month default range', async () => {
   await db.saveVehicle({ id: 'fuel', name: '燃油测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
@@ -207,7 +289,7 @@ it('filters, edits, excludes and restores replenishment records', async () => {
   const amount = screen.getByLabelText('金额（元）')
   expect(amount).toHaveValue(125)
   fireEvent.change(amount, { target: { value: '130' } })
-  fireEvent.click(screen.getByRole('button', { name: '保存记录' }))
+  fireEvent.click(screen.getByRole('button', { name: '保存更改' }))
   await waitFor(() => expect(within(screen.getByRole('table', { name: '补能记录' })).getByText('¥130.00')).toBeInTheDocument())
 
   fireEvent.click(within(screen.getByRole('table', { name: '补能记录' })).getByRole('button', { name: '排除2026年8月20日加油记录' }))
