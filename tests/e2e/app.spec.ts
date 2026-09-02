@@ -118,4 +118,11 @@ test('keeps the primary record fields from overlapping at a medium desktop width
   expect(place!.y).toBe(notes!.y)
   expect(place!.height).toBe(notes!.height)
 
+  const textStyles = await Promise.all([
+    page.getByLabel('金额（元）').evaluate(element => ({ size: getComputedStyle(element).fontSize, weight: getComputedStyle(element).fontWeight })),
+    page.getByLabel('发生时间').evaluate(element => ({ size: getComputedStyle(element).fontSize, weight: getComputedStyle(element).fontWeight })),
+    page.getByLabel('当前里程（km）').evaluate(element => ({ size: getComputedStyle(element).fontSize, weight: getComputedStyle(element).fontWeight })),
+  ])
+  expect(textStyles[0]).toEqual(textStyles[1])
+  expect(textStyles[1]).toEqual(textStyles[2])
 })
