@@ -72,4 +72,6 @@ table { width: 100%; border-collapse: collapse; background: white; } th, td { te
   .dashboard-heading .toolbar { width: 100%; }
 }
 
-.record-primary > label { min-width: 0; } .record-primary input { box-sizing: border-box; min-width: 0; width: 100%; }
+.record-primary > label { min-width: 0; } .record-primary input { box-sizing: border-box; height: 41px; min-width: 0; width: 100%; }
+
+.record-extra .field { align-items: start; } .record-extra input, .record-extra textarea { box-sizing: border-box; height: 76px; min-height: 76px; width: 100%; }
