@@ -105,5 +105,17 @@ test('keeps the primary record fields from overlapping at a medium desktop width
   expect(date).not.toBeNull()
   expect(mileage).not.toBeNull()
   expect(amount!.x + amount!.width).toBeLessThanOrEqual(date!.x)
+  expect(amount!.height).toBe(date!.height)
+  expect(date!.height).toBe(mileage!.height)
   expect(date!.x + date!.width).toBeLessThanOrEqual(mileage!.x)
+
+  const [place, notes] = await Promise.all([
+    page.getByLabel('停车场或地点').boundingBox(),
+    page.getByLabel('备注').boundingBox(),
+  ])
+  expect(place).not.toBeNull()
+  expect(notes).not.toBeNull()
+  expect(place!.y).toBe(notes!.y)
+  expect(place!.height).toBe(notes!.height)
+
 })
