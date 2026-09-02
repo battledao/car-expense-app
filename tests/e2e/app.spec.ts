@@ -86,3 +86,24 @@ test('adapts energy scenes by vehicle type and supports keyboard scene selection
   await expect(page.getByText('保存成功，可以继续记账。')).toBeVisible()
   await expect(page.getByLabel('金额（元）')).toHaveValue('')
 })
+
+test('keeps the primary record fields from overlapping at a medium desktop width', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 900 })
+  await page.goto('/vehicles')
+  await page.getByRole('button', { name: '新增车辆' }).click()
+  await page.getByLabel('车辆名称').fill('布局测试车')
+  await page.getByLabel('初始里程（km）').fill('0')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+  await page.getByRole('button', { name: '＋记一笔' }).click()
+
+  const [amount, date, mileage] = await Promise.all([
+    page.getByLabel('金额（元）').boundingBox(),
+    page.getByLabel('发生时间').boundingBox(),
+    page.getByLabel('当前里程（km）').boundingBox(),
+  ])
+  expect(amount).not.toBeNull()
+  expect(date).not.toBeNull()
+  expect(mileage).not.toBeNull()
+  expect(amount!.x + amount!.width).toBeLessThanOrEqual(date!.x)
+  expect(date!.x + date!.width).toBeLessThanOrEqual(mileage!.x)
+})
