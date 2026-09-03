@@ -10,23 +10,23 @@ async function addVehicle(page: import('@playwright/test').Page, name: string, t
 }
 async function addFuelRecord(page: import('@playwright/test').Page, date: string, mileage: string, liters: string, amount: string, full: boolean) {
   await page.goto('/record')
-  await page.getByLabel('费用类别').selectOption('fuel')
+  await page.getByRole('button', { name: '加油' }).click()
   await page.getByLabel('金额（元）').fill(amount)
   await page.getByLabel('发生时间').fill(date)
   await page.getByLabel('当前里程（km）').fill(mileage)
   await page.getByLabel('加油量（升）').fill(liters)
   if (full) await page.getByLabel('已加满').check()
-  await page.getByRole('button', { name: '保存记录' }).click()
+  await page.getByRole('button', { name: '保存并查看记录' }).click()
 }
 async function addChargeRecord(page: import('@playwright/test').Page, date: string, mileage: string, kwh: string, amount: string, full: boolean) {
   await page.goto('/record')
-  await page.getByLabel('费用类别').selectOption('charge')
+  await page.getByRole('button', { name: '充电' }).click()
   await page.getByLabel('金额（元）').fill(amount)
   await page.getByLabel('发生时间').fill(date)
   await page.getByLabel('当前里程（km）').fill(mileage)
   await page.getByLabel('充电量（kWh）').fill(kwh)
   if (full) await page.getByLabel('已充满').check()
-  await page.getByRole('button', { name: '保存记录' }).click()
+  await page.getByRole('button', { name: '保存并查看记录' }).click()
 }test('switches energy vehicles, ranges and quick record actions', async ({ page }) => {
   await addVehicle(page, '燃油测试车', 'fuel')
   await addVehicle(page, '纯电测试车', 'electric')
@@ -89,7 +89,7 @@ test('edits, excludes and restores energy records with persistence', async ({ pa
   await page.getByRole('button', { name: '编辑2026年8月20日加油记录' }).click()
   const dialog = page.getByRole('dialog', { name: '编辑补能记录' })
   await dialog.getByLabel('金额（元）').fill('130')
-  await dialog.getByRole('button', { name: '保存记录' }).click()
+  await dialog.getByRole('button', { name: '保存更改' }).click()
   await expect(page.getByRole('table', { name: '补能记录' })).toContainText('¥130.00')
 
   await page.getByRole('button', { name: '排除2026年8月20日加油记录' }).click()

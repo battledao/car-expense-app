@@ -9,7 +9,7 @@ test('filters dashboard records by month and keeps the filter in detailed record
   await page.getByRole('button', { name: '＋记一笔' }).click()
   await page.getByLabel('金额（元）').fill('25')
   await page.getByLabel('发生时间').fill('2026-08-15T12:00')
-  await page.getByRole('button', { name: '保存记录' }).click()
+  await page.getByRole('button', { name: '保存并查看记录' }).click()
   await page.getByRole('link', { name: '首页总览' }).click()
   await page.getByLabel('首页月份').fill('2026-08')
 

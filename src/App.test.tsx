@@ -13,6 +13,7 @@ beforeEach(async () => {
   })
 })
 afterEach(async () => {
+  vi.restoreAllMocks()
   cleanup()
   await db.transaction('rw', db.vehicles, db.records, db.settings, async () => {
     await db.records.clear()
@@ -27,6 +28,106 @@ it('shows all seven primary navigation items', () => {
   expect(screen.getByRole('button', { name: '＋记一笔' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '数据管理' })).toBeInTheDocument()
   expect(screen.getAllByText(/⌂|✎|□|◔|☷|ϟ|▣/)).toHaveLength(7)
+})
+
+it('summarizes calendar days for the selected month and vehicle, then shows ordered day details', async () => {
+  await db.saveVehicle({ id: 'calendar-fuel', name: '日历燃油车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveVehicle({ id: 'calendar-electric', name: '日历电动车', energyType: 'electric', initialMileage: 0 })
+  const base = { excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'calendar-early', vehicleId: 'calendar-fuel', category: 'parking', amountCents: 1200, occurredAt: '2026-08-03T08:00', merchantOrLocation: '早高峰停车场' })
+  await db.saveRecord({ ...base, id: 'calendar-late', vehicleId: 'calendar-fuel', category: 'wash', amountCents: 3800, occurredAt: '2026-08-03T18:00', merchantOrLocation: '洗车店' })
+  await db.saveRecord({ ...base, id: 'calendar-other-day', vehicleId: 'calendar-fuel', category: 'toll', amountCents: 500, occurredAt: '2026-08-04T10:00' })
+  await db.saveRecord({ ...base, id: 'calendar-other-vehicle', vehicleId: 'calendar-electric', category: 'charge', amountCents: 2600, occurredAt: '2026-08-03T12:00', chargeKwh: 20 })
+
+  render(<MemoryRouter initialEntries={['/calendar?month=2026-08&day=2026-08-03']}><App /></MemoryRouter>)
+
+  expect(await screen.findByLabelText('费用日历月份')).toHaveValue('2026-08')
+  expect(screen.getByText('当月费用').closest('.metric')).toHaveTextContent('¥55.00')
+  expect(screen.getByText('当月记录').closest('.metric')).toHaveTextContent('3 笔')
+  expect(screen.getByText('有费用天数').closest('.metric')).toHaveTextContent('2 天')
+  expect(screen.getByRole('button', { name: /2026年8月3日.*2笔.*¥50\.00/ })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: /2026年8月3日/ })).toBeInTheDocument()
+  const details = screen.getByRole('region', { name: '当天记录' })
+  expect(details).toHaveTextContent('早高峰停车场')
+  expect(details).toHaveTextContent('洗车店')
+  expect(details.textContent!.indexOf('早高峰停车场')).toBeLessThan(details.textContent!.indexOf('洗车店'))
+
+  fireEvent.change(screen.getByLabelText('当前车辆'), { target: { value: 'all' } })
+  await waitFor(() => expect(screen.getByText('当月费用').closest('.metric')).toHaveTextContent('¥81.00'))
+  expect(screen.getByRole('region', { name: '当天记录' })).toHaveTextContent('日历电动车')
+})
+
+it('returns from calendar bookkeeping and updates calendar records after editing or deleting', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-09-03T18:25:00').getTime())
+  await db.saveVehicle({ id: 'calendar-actions', name: '日历操作车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveRecord({ id: 'calendar-edit', vehicleId: 'calendar-actions', category: 'parking', amountCents: 1200, occurredAt: '2026-08-03T08:00', merchantOrLocation: '机场停车场', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+  render(<MemoryRouter initialEntries={['/calendar?month=2026-08&day=2026-08-03']}><App /></MemoryRouter>)
+
+  fireEvent.click(await screen.findByRole('link', { name: '为这天记一笔' }))
+  expect(await screen.findByLabelText('发生时间')).toHaveValue('2026-08-03T18:25')
+  fireEvent.change(screen.getByLabelText('金额（元）'), { target: { value: '20' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存并返回日历' }))
+  await waitFor(() => expect(screen.getByRole('heading', { name: '费用日历' })).toBeInTheDocument())
+  expect(screen.getByText('当月费用').closest('.metric')).toHaveTextContent('¥32.00')
+
+  fireEvent.click(screen.getByRole('button', { name: /查看记录：停车.*机场停车场/ }))
+  const detail = await screen.findByRole('dialog', { name: '记录详情' })
+  expect(detail).toHaveTextContent('机场停车场')
+  fireEvent.click(within(detail).getByRole('button', { name: '编辑记录' }))
+  fireEvent.change(screen.getByLabelText('金额（元）'), { target: { value: '30' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存更改' }))
+  await waitFor(() => expect(screen.getByText('当月费用').closest('.metric')).toHaveTextContent('¥50.00'))
+
+  fireEvent.click(screen.getByRole('button', { name: /查看记录：停车.*机场停车场/ }))
+  fireEvent.click(within(await screen.findByRole('dialog', { name: '记录详情' })).getByRole('button', { name: '删除记录' }))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '记录详情' })).not.toBeInTheDocument())
+  expect(confirm).toHaveBeenCalled()
+  expect(screen.getByText('当月费用').closest('.metric')).toHaveTextContent('¥20.00')
+  confirm.mockRestore()
+})
+
+it('shows calendar-specific empty states and requires a vehicle when all vehicles has no default', async () => {
+  const first = render(<MemoryRouter initialEntries={['/calendar']}><App /></MemoryRouter>)
+  expect(screen.getByText('请先添加一辆车，再按日期查看费用。')).toBeInTheDocument()
+  first.unmount()
+
+  await db.saveVehicle({ id: 'calendar-empty-a', name: '无默认车 A', energyType: 'fuel', initialMileage: 0, isDefault: false })
+  await db.saveVehicle({ id: 'calendar-empty-b', name: '无默认车 B', energyType: 'electric', initialMileage: 0, isDefault: false })
+  const second = render(<MemoryRouter initialEntries={['/calendar']}><App /></MemoryRouter>)
+  expect(await screen.findByText('还没有用车费用记录。')).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('当前车辆'), { target: { value: 'all' } })
+  const todayLink = screen.getByRole('link', { name: '为今天记一笔' })
+  await waitFor(() => expect(todayLink).not.toHaveAttribute('href', expect.stringContaining('vehicle=')))
+  fireEvent.click(todayLink)
+  await waitFor(() => expect(screen.getByLabelText('所属车辆')).toHaveValue(''))
+  second.unmount()
+
+  await db.saveRecord({ id: 'calendar-history', vehicleId: 'calendar-empty-a', category: 'parking', amountCents: 1000, occurredAt: '2026-07-03T10:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter initialEntries={['/calendar?month=2026-08']}><App /></MemoryRouter>)
+  expect(await screen.findByText('本月暂无费用记录。')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '2026年8月3日，无费用记录' }))
+  expect(screen.getByText('这一天暂无费用记录。')).toBeInTheDocument()
+})
+
+it('keeps calendar detail open on delete failure and restores focus after closing', async () => {
+  await db.saveVehicle({ id: 'calendar-focus', name: '日历焦点车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveRecord({ id: 'calendar-focus-record', vehicleId: 'calendar-focus', category: 'parking', amountCents: 1200, occurredAt: '2026-08-03T08:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  const remove = vi.spyOn(db, 'removeRecord').mockRejectedValueOnce(new Error('写入失败'))
+
+  render(<MemoryRouter initialEntries={['/calendar?month=2026-08&day=2026-08-03']}><App /></MemoryRouter>)
+  const record = await screen.findByRole('button', { name: '查看记录：停车' })
+  fireEvent.click(record)
+  const detail = await screen.findByRole('dialog', { name: '记录详情' })
+  expect(within(detail).getByRole('button', { name: '关闭' })).toHaveFocus()
+  fireEvent.click(within(detail).getByRole('button', { name: '删除记录' }))
+  await waitFor(() => expect(screen.getByText('删除失败，请检查本地数据后重试。')).toBeInTheDocument())
+  expect(screen.getByRole('dialog', { name: '记录详情' })).toBeInTheDocument()
+  fireEvent.click(within(detail).getByRole('button', { name: '关闭' }))
+  await waitFor(() => expect(record).toHaveFocus())
+  expect(remove).toHaveBeenCalledWith('calendar-focus-record')
 })
 
 it('shows month-aware dashboard metrics for one vehicle and active vehicle count for all vehicles', async () => {
@@ -178,7 +279,7 @@ it('applies valid vehicle, category and date parameters when entering the record
 
   await waitFor(() => expect(screen.getByLabelText('所属车辆')).toHaveValue('hybrid'))
   expect(screen.getByRole('button', { name: '充电' })).toHaveAttribute('aria-pressed', 'true')
-  expect(screen.getByLabelText('发生时间')).toHaveValue('2026-08-10T12:00')
+  expect((screen.getByLabelText('发生时间') as HTMLInputElement).value).toMatch(/^2026-08-10T\d{2}:\d{2}$/)
 })
 it('provides vehicle-aware energy controls and a twelve-month default range', async () => {
   await db.saveVehicle({ id: 'fuel', name: '燃油测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
