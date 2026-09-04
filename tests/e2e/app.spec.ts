@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { devices, expect, test } from '@playwright/test'
 
 test('can navigate all primary modules and create a vehicle', async ({ page }) => {
   await page.goto('/')
@@ -190,3 +190,41 @@ test('records, edits and deletes a dated expense from the calendar', async ({ pa
   await page.getByRole('dialog', { name: '记录详情' }).getByRole('button', { name: '删除记录' }).click()
   await expect(page.getByText('当月费用').locator('..')).toContainText('¥20.00')
 })
+
+for (const deviceName of ['iPhone 14', 'Galaxy S9+']) {
+  const { defaultBrowserType: _defaultBrowserType, ...device } = devices[deviceName]
+
+  test.describe(`mobile calendar acceptance: ${deviceName}`, () => {
+    test.use(device)
+
+    test('supports the calendar bookkeeping flow without horizontal overflow', async ({ page }) => {
+      await page.goto('/vehicles')
+      await page.getByRole('button', { name: '新增车辆' }).click()
+      await page.getByLabel('车辆名称').fill(`${deviceName} 测试车`)
+      await page.getByLabel('初始里程（km）').fill('0')
+      await page.getByRole('button', { name: '保存车辆' }).click()
+
+      await page.getByRole('button', { name: '＋记一笔' }).click()
+      await page.getByLabel('金额（元）').fill('18')
+      await page.getByLabel('发生时间').fill('2026-09-04T08:00')
+      await page.getByRole('button', { name: '保存并查看记录' }).click()
+      await page.getByRole('link', { name: '费用日历' }).click()
+      await page.getByLabel('费用日历月份').fill('2026-09')
+
+      const panels = page.locator('.calendar-layout > .panel')
+      const [calendarPanel, detailPanel] = await Promise.all([panels.nth(0).boundingBox(), panels.nth(1).boundingBox()])
+      expect(calendarPanel).not.toBeNull()
+      expect(detailPanel).not.toBeNull()
+      expect(calendarPanel!.y + calendarPanel!.height).toBeLessThanOrEqual(detailPanel!.y)
+      await expect(page.getByRole('button', { name: /2026年9月4日.*1笔.*¥18\.00/ })).toBeVisible()
+      await page.getByRole('button', { name: /2026年9月4日.*1笔.*¥18\.00/ }).click()
+      await expect(page.getByRole('region', { name: '当天记录' })).toContainText('¥18.00')
+
+      await page.getByRole('link', { name: '为这天记一笔' }).click()
+      await page.getByLabel('金额（元）').fill('12')
+      await page.getByRole('button', { name: '保存并返回日历' }).click()
+      await expect(page.getByText('当月费用').locator('..')).toContainText('¥30.00')
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+    })
+  })
+}
