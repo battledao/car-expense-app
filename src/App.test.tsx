@@ -30,6 +30,128 @@ it('shows all seven primary navigation items', () => {
   expect(screen.getAllByText(/⌂|✎|□|◔|☷|ϟ|▣/)).toHaveLength(7)
 })
 
+it('reads analysis filters from the URL, validates custom dates and clears filters', async () => {
+  await db.saveVehicle({ id: 'analysis-filters', name: '分析筛选车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-11&end=2026-01-10&category=parking']}><App /></MemoryRouter>)
+
+  expect(await screen.findByLabelText('时间范围')).toHaveValue('custom')
+  expect(screen.getByLabelText('分析类别')).toHaveValue('parking')
+  expect(screen.getByLabelText('分析开始日期')).toHaveValue('2026-01-11')
+  expect(screen.getByLabelText('分析结束日期')).toHaveValue('2026-01-10')
+  expect(screen.getByRole('alert')).toHaveTextContent('开始日期不能晚于结束日期。')
+  expect(screen.queryByText('总费用')).not.toBeInTheDocument()
+  expect(screen.getByRole('option', { name: '全部时间' })).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: '清除筛选' }))
+  expect(screen.getByLabelText('时间范围')).toHaveValue('year')
+  expect(screen.getByLabelText('分析类别')).toHaveValue('')
+  expect(screen.queryByLabelText('分析开始日期')).not.toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+it('shows analysis summary, previous-period change and single-vehicle cost per kilometre', async () => {
+  await db.saveVehicle({ id: 'analysis-summary', name: '分析指标车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-summary', defaultVehicleId: 'analysis-summary' })
+  const base = { vehicleId: 'analysis-summary', excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'previous', category: 'parking', amountCents: 1000, occurredAt: '2026-04-15T10:00' })
+  await db.saveRecord({ ...base, id: 'may', category: 'parking', amountCents: 2000, occurredAt: '2026-05-01T10:00', mileage: 100 })
+  await db.saveRecord({ ...base, id: 'july', category: 'wash', amountCents: 4000, occurredAt: '2026-07-31T10:00', mileage: 300 })
+
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-05-01&end=2026-07-31']}><App /></MemoryRouter>)
+
+  await waitFor(() => expect(screen.getByText('总费用').closest('.metric')).toHaveTextContent('¥60.00'))
+  expect(screen.getByText('记录数量').closest('.metric')).toHaveTextContent('2 笔')
+  expect(screen.getByText('平均每月费用').closest('.metric')).toHaveTextContent('¥20.00')
+  expect(screen.getByText('较上一周期').closest('.metric')).toHaveTextContent('+500.0%')
+  expect(screen.getByText('最高费用类别').closest('.metric')).toHaveTextContent('洗车')
+  expect(screen.getByText('每公里综合成本').closest('.metric')).toHaveTextContent('¥0.30/km')
+})
+
+it('shows a continuous analysis trend with zero periods and record drill-down links', async () => {
+  await db.saveVehicle({ id: 'analysis-trend', name: '分析趋势车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-trend', defaultVehicleId: 'analysis-trend' })
+  const base = { vehicleId: 'analysis-trend', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'trend-first', amountCents: 1000, occurredAt: '2026-01-01T10:00' })
+  await db.saveRecord({ ...base, id: 'trend-last', amountCents: 2000, occurredAt: '2026-01-03T10:00' })
+
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-03']}><App /></MemoryRouter>)
+
+  expect(await screen.findByRole('img', { name: '费用趋势图' })).toBeInTheDocument()
+  const zeroDay = screen.getByRole('link', { name: '2026-01-02，¥0.00，0笔' })
+  expect(zeroDay).toHaveAttribute('href', expect.stringContaining('start=2026-01-02'))
+  expect(zeroDay).toHaveAttribute('href', expect.stringContaining('end=2026-01-02'))
+  await waitFor(() => expect(zeroDay).toHaveAttribute('href', expect.stringContaining('vehicle=analysis-trend')))
+})
+
+it('shows monthly totals, counts and honest month-over-month comparisons', async () => {
+  await db.saveVehicle({ id: 'analysis-months', name: '月份对比车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-months', defaultVehicleId: 'analysis-months' })
+  const base = { vehicleId: 'analysis-months', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'month-jan', amountCents: 1000, occurredAt: '2026-01-10T10:00' })
+  await db.saveRecord({ ...base, id: 'month-feb', amountCents: 2000, occurredAt: '2026-02-10T10:00' })
+  await db.saveRecord({ ...base, id: 'month-apr', amountCents: 1000, occurredAt: '2026-04-10T10:00' })
+
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-04-30']}><App /></MemoryRouter>)
+
+  const panel = (await screen.findByRole('heading', { name: '月份费用对比' })).closest('.panel') as HTMLElement
+  expect(await within(panel).findByRole('link', { name: '2026-03，¥0.00，0笔，较上月-¥20.00 · -100.0%' })).toBeInTheDocument()
+  expect(within(panel).getByRole('link', { name: '2026-04，¥10.00，1笔，较上月暂无可比数据' })).toBeInTheDocument()
+})
+
+it('shows category and all-vehicle amounts, counts, shares and drill-down links', async () => {
+  await db.saveVehicle({ id: 'analysis-car-a', name: '分析车 A', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveVehicle({ id: 'analysis-car-b', name: '分析车 B', energyType: 'electric', initialMileage: 0 })
+  await db.saveVehicle({ id: 'analysis-car-empty', name: '无费用车', energyType: 'fuel', initialMileage: 0 })
+  await db.settings.put({ id: 'app' })
+  const base = { excludedFromEnergy: false, createdAt: '', updatedAt: '', occurredAt: '2026-01-10T10:00' }
+  await db.saveRecord({ ...base, id: 'breakdown-a', vehicleId: 'analysis-car-a', category: 'parking', amountCents: 2000 })
+  await db.saveRecord({ ...base, id: 'breakdown-b', vehicleId: 'analysis-car-a', category: 'wash', amountCents: 1000 })
+  await db.saveRecord({ ...base, id: 'breakdown-c', vehicleId: 'analysis-car-b', category: 'parking', amountCents: 1000 })
+
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-31']}><App /></MemoryRouter>)
+
+  const categoryLink = await screen.findByRole('link', { name: '停车，¥30.00，2笔，75%' })
+  expect(categoryLink).toHaveAttribute('href', expect.stringContaining('category=parking'))
+  const vehicleLink = screen.getByRole('link', { name: '分析车 A，¥30.00，2笔，75%' })
+  expect(vehicleLink).toHaveAttribute('href', expect.stringContaining('vehicle=analysis-car-a'))
+  expect(screen.getByRole('link', { name: '无费用车，¥0.00，0笔，0%' })).toBeInTheDocument()
+})
+
+it('updates analysis immediately when records are added, edited or removed', async () => {
+  await db.saveVehicle({ id: 'analysis-live', name: '实时分析车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-live', defaultVehicleId: 'analysis-live' })
+  const base = { vehicleId: 'analysis-live', category: 'parking' as const, occurredAt: '2026-01-10T10:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'analysis-live-a', amountCents: 1000 })
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-31']}><App /></MemoryRouter>)
+
+  await waitFor(() => expect(screen.getByText('总费用').closest('.metric')).toHaveTextContent('¥10.00'))
+  await db.saveRecord({ ...base, id: 'analysis-live-b', amountCents: 2000 })
+  await waitFor(() => expect(screen.getByText('总费用').closest('.metric')).toHaveTextContent('¥30.00'))
+  await db.saveRecord({ ...base, id: 'analysis-live-b', amountCents: 2500 })
+  await waitFor(() => expect(screen.getByText('总费用').closest('.metric')).toHaveTextContent('¥35.00'))
+  await db.removeRecord('analysis-live-a')
+  await waitFor(() => expect(screen.getByText('总费用').closest('.metric')).toHaveTextContent('¥25.00'))
+})
+
+it('shows distinct analysis empty states without hiding valid partial results', async () => {
+  const noVehicle = render(<MemoryRouter initialEntries={['/analysis']}><App /></MemoryRouter>)
+  expect(screen.getByText('请先添加一辆车，再查看费用分析。')).toBeInTheDocument()
+  noVehicle.unmount()
+
+  await db.saveVehicle({ id: 'analysis-empty', name: '分析空状态车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-empty', defaultVehicleId: 'analysis-empty' })
+  const noRecords = render(<MemoryRouter initialEntries={['/analysis']}><App /></MemoryRouter>)
+  expect(await screen.findByText('还没有用车费用记录。')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: '记录第一笔费用' })).toBeInTheDocument()
+  noRecords.unmount()
+
+  await db.saveRecord({ id: 'analysis-history', vehicleId: 'analysis-empty', category: 'parking', amountCents: 1000, occurredAt: '2025-01-10T10:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-31']}><App /></MemoryRouter>)
+  expect(await screen.findByText('当前筛选条件下没有费用记录。')).toBeInTheDocument()
+  expect(screen.getByText('每公里综合成本').closest('.metric')).toHaveTextContent('至少需要两条含里程记录。')
+  expect(screen.getByRole('heading', { name: '数据分析' })).toBeInTheDocument()
+})
+
 it('summarizes calendar days for the selected month and vehicle, then shows ordered day details', async () => {
   await db.saveVehicle({ id: 'calendar-fuel', name: '日历燃油车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   await db.saveVehicle({ id: 'calendar-electric', name: '日历电动车', energyType: 'electric', initialMileage: 0 })

@@ -79,3 +79,15 @@ table { width: 100%; border-collapse: collapse; background: white; } th, td { te
 .record-extra .field { align-items: start; } .record-extra input, .record-extra textarea { box-sizing: border-box; height: 76px; min-height: 76px; width: 100%; }
 
 @media (max-width: 760px) { .calendar-heading { flex-direction: column; } .calendar-layout { grid-template-columns: 1fr; } .calendar-day { min-height: 82px; padding: 6px; } }
+
+.analysis-page { max-width: 1280px; }
+.analysis-filters > label { display: grid; gap: 4px; min-width: 150px; }
+.analysis-metrics { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.analysis-chart { min-width: 0; overflow: hidden; }
+.analysis-empty { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.analysis-empty p { margin: 0; }
+.analysis-empty a, .analysis-points a { color: #174f47; }
+.analysis-points a { display: inline-flex; align-items: center; min-height: 44px; padding: 6px 8px; border: 1px solid #bdd0cb; border-radius: 7px; text-decoration: none; }
+.analysis-months a, .analysis-breakdown a { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; color: inherit; text-decoration: none; }
+.analysis-months strong, .analysis-breakdown strong { text-align: right; }
+@media (max-width: 600px) { .analysis-filters > label, .analysis-filters > button { flex: 1 1 100%; } .analysis-months a, .analysis-breakdown a { align-items: flex-start; flex-direction: column; } .analysis-months strong, .analysis-breakdown strong { text-align: left; } }

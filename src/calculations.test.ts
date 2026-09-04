@@ -1,11 +1,102 @@
 import { describe, expect, it } from 'vitest'
-import { averageEnergy, byCategory, costPerKm, energyDateRange, energyIntervals, energyQuality, energySummary, energyUnitPriceCents, filterEnergyIntervals, filterRecords, hybridEnergyCost, monthSummary, monthlyCostPerKm, monthlyTrend, totalCents } from './calculations'
+import { analysisCategories, analysisCostPerKm, analysisDateRange, analysisMonths, analysisSummary, analysisTrend, analysisVehicles, averageEnergy, byCategory, costPerKm, energyDateRange, energyIntervals, energyQuality, energySummary, energyUnitPriceCents, filterEnergyIntervals, filterRecords, hybridEnergyCost, monthSummary, monthlyCostPerKm, monthlyTrend, totalCents } from './calculations'
 import type { ExpenseRecord, Vehicle } from './models'
 
 const vehicle: Vehicle = { id: 'v1', name: '车', energyType: 'fuel', initialMileage: 1000, isDefault: true, createdAt: '', updatedAt: '' }
 const record = (id: string, extra: Partial<ExpenseRecord>): ExpenseRecord => ({ id, vehicleId: 'v1', category: 'parking', amountCents: 1000, occurredAt: '2026-08-01T10:00', excludedFromEnergy: false, createdAt: '', updatedAt: '', ...extra })
 
 describe('calculations', () => {
+  it('resolves analysis presets and validates custom date ranges', () => {
+    const now = new Date(2026, 0, 15, 12)
+    const records = [
+      record('old', { occurredAt: '2024-02-29T10:00' }),
+      record('new', { occurredAt: '2026-01-10T10:00' }),
+    ]
+    expect(analysisDateRange('month', now, records)).toEqual({ start: '2026-01-01', end: '2026-01-15' })
+    expect(analysisDateRange('three', now, records)).toEqual({ start: '2025-11-01', end: '2026-01-15' })
+    expect(analysisDateRange('year', now, records)).toEqual({ start: '2026-01-01', end: '2026-01-15' })
+    expect(analysisDateRange('all', now, records)).toEqual({ start: '2024-02-29', end: '2026-01-10' })
+    expect(analysisDateRange('all', now, [])).toEqual({})
+    expect(analysisDateRange('custom', now, records, '', '2026-01-10')).toEqual({ error: '请选择开始和结束日期。' })
+    expect(analysisDateRange('custom', now, records, '2026-01-11', '2026-01-10')).toEqual({ error: '开始日期不能晚于结束日期。' })
+    expect(analysisDateRange('custom', now, records, '2024-02-29', '2024-03-01')).toEqual({ start: '2024-02-29', end: '2024-03-01' })
+  })
+
+  it('summarizes analysis over calendar months and an equal previous period', () => {
+    const records = [
+      record('previous', { occurredAt: '2026-04-15T10:00', amountCents: 1000 }),
+      record('may', { occurredAt: '2026-05-01T10:00', amountCents: 2000, mileage: 100 }),
+      record('july', { occurredAt: '2026-07-31T10:00', category: 'wash', amountCents: 4000, mileage: 300 }),
+    ]
+    expect(analysisSummary(records, { start: '2026-05-01', end: '2026-07-31' })).toEqual({
+      totalCents: 6000,
+      count: 2,
+      monthCount: 3,
+      averageMonthCents: 2000,
+      previousCents: 1000,
+      changePercent: 500,
+      topCategory: 'wash',
+      activeVehicleCount: 1,
+    })
+    expect(analysisSummary([records[1]], { start: '2026-05-01', end: '2026-05-31' }).changePercent).toBeUndefined()
+    expect(analysisCostPerKm(records.slice(1))).toEqual({ distance: 200, costCents: 6000, costPerKm: 30 })
+    expect(analysisCostPerKm([records[1]])).toEqual({ reason: '至少需要两条含里程记录。' })
+    expect(analysisCostPerKm([records[2], record('backward', { occurredAt: '2026-08-01T10:00', mileage: 200 })])).toEqual({ reason: '里程需要严格递增。' })
+  })
+
+  it('builds continuous daily or monthly analysis trends', () => {
+    const records = [
+      record('jan-1', { occurredAt: '2026-01-01T10:00', amountCents: 1000 }),
+      record('jan-3', { occurredAt: '2026-01-03T10:00', amountCents: 2000 }),
+      record('feb-1', { occurredAt: '2026-02-01T10:00', amountCents: 3000 }),
+    ]
+    expect(analysisTrend(records, { start: '2026-01-01', end: '2026-01-03' })).toEqual([
+      { key: '2026-01-01', start: '2026-01-01', end: '2026-01-01', totalCents: 1000, count: 1 },
+      { key: '2026-01-02', start: '2026-01-02', end: '2026-01-02', totalCents: 0, count: 0 },
+      { key: '2026-01-03', start: '2026-01-03', end: '2026-01-03', totalCents: 2000, count: 1 },
+    ])
+    expect(analysisTrend(records, { start: '2026-01-01', end: '2026-02-01' })).toEqual([
+      { key: '2026-01', start: '2026-01-01', end: '2026-01-31', totalCents: 3000, count: 2 },
+      { key: '2026-02', start: '2026-02-01', end: '2026-02-01', totalCents: 3000, count: 1 },
+    ])
+  })
+
+  it('compares calendar months without inventing percentages from zero', () => {
+    const records = [
+      record('jan', { occurredAt: '2026-01-10T10:00', amountCents: 1000 }),
+      record('feb', { occurredAt: '2026-02-10T10:00', amountCents: 2000 }),
+      record('apr', { occurredAt: '2026-04-10T10:00', amountCents: 1000 }),
+    ]
+    expect(analysisMonths(records, { start: '2026-01-01', end: '2026-04-30' })).toEqual([
+      { key: '2026-01', start: '2026-01-01', end: '2026-01-31', totalCents: 1000, count: 1, changeCents: undefined, changePercent: undefined },
+      { key: '2026-02', start: '2026-02-01', end: '2026-02-28', totalCents: 2000, count: 1, changeCents: 1000, changePercent: 100 },
+      { key: '2026-03', start: '2026-03-01', end: '2026-03-31', totalCents: 0, count: 0, changeCents: -2000, changePercent: -100 },
+      { key: '2026-04', start: '2026-04-01', end: '2026-04-30', totalCents: 1000, count: 1, changeCents: undefined, changePercent: undefined },
+    ])
+  })
+
+  it('ranks category and vehicle shares while keeping zero-cost vehicles last', () => {
+    const vehicles = [
+      vehicle,
+      { ...vehicle, id: 'v2', name: '第二辆车', isDefault: false },
+      { ...vehicle, id: 'v3', name: '无费用车', isDefault: false },
+    ]
+    const records = [
+      record('parking-a', { amountCents: 2000 }),
+      record('wash', { category: 'wash', amountCents: 1000 }),
+      record('parking-b', { vehicleId: 'v2', amountCents: 1000 }),
+    ]
+    expect(analysisCategories(records)).toEqual([
+      { category: 'parking', totalCents: 3000, count: 2, percent: 75 },
+      { category: 'wash', totalCents: 1000, count: 1, percent: 25 },
+    ])
+    expect(analysisVehicles(records, vehicles)).toEqual([
+      { vehicleId: 'v1', name: '车', totalCents: 3000, count: 2, percent: 75 },
+      { vehicleId: 'v2', name: '第二辆车', totalCents: 1000, count: 1, percent: 25 },
+      { vehicleId: 'v3', name: '无费用车', totalCents: 0, count: 0, percent: 0 },
+    ])
+  })
+
   it('filters and aggregates records', () => {
     const records = [record('a', { category: 'parking', amountCents: 2000, notes: '机场' }), record('b', { category: 'wash', amountCents: 500, notes: '小区' })]
     expect(filterRecords(records, { query: '机场' }).map(item => item.id)).toEqual(['a'])
