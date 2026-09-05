@@ -18,7 +18,8 @@ test('filters dashboard records by month and keeps the filter in detailed record
   await page.getByRole('link', { name: '查看本月记录' }).click()
   await expect(page.getByLabel('开始日期')).toHaveValue('2026-08-01')
   await expect(page.getByLabel('结束日期')).toHaveValue('2026-08-31')
-  await expect(page.getByText('共 1 笔，合计 ¥25.00')).toBeVisible()
+  await expect(page.getByText('记录数量').locator('..')).toContainText('1 笔')
+  await expect(page.getByText('总金额').locator('..')).toContainText('¥25.00')
 })
 
 test('keeps the dashboard controls usable on a narrow screen', async ({ page }) => {
