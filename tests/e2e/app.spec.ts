@@ -12,7 +12,8 @@ test('can navigate all primary modules and create a vehicle', async ({ page }) =
   await page.getByRole('button', { name: '＋记一笔' }).click()
   await page.getByLabel('金额（元）').fill('20')
   await page.getByRole('button', { name: '保存并查看记录' }).click()
-  await expect(page.getByText('共 1 笔，合计 ¥20.00')).toBeVisible()
+  await expect(page.getByText('记录数量').locator('..')).toContainText('1 笔')
+  await expect(page.getByText('总金额').locator('..')).toContainText('¥20.00')
 })
 
 test('sorts detailed records by date ascending by default and can switch to descending', async ({ page }) => {
@@ -178,14 +179,14 @@ test('records, edits and deletes a dated expense from the calendar', async ({ pa
   await page.getByRole('button', { name: '保存并返回日历' }).click()
   await expect(page.getByText('当月费用').locator('..')).toContainText('¥32.00')
 
-  await page.getByRole('button', { name: /查看记录：停车/ }).first().click()
+  await page.getByRole('region', { name: '当天记录' }).getByRole('button', { name: /查看记录：停车/ }).filter({ hasText: '¥12.00' }).click()
   await page.getByRole('dialog', { name: '记录详情' }).getByRole('button', { name: '编辑记录' }).click()
   const editDialog = page.getByRole('dialog', { name: '编辑记录' })
   await editDialog.getByLabel('金额（元）').fill('30')
   await editDialog.getByRole('button', { name: '保存更改' }).click()
   await expect(page.getByText('当月费用').locator('..')).toContainText('¥50.00')
 
-  await page.getByRole('button', { name: /查看记录：停车/ }).first().click()
+  await page.getByRole('region', { name: '当天记录' }).getByRole('button', { name: /查看记录：停车/ }).filter({ hasText: '¥30.00' }).click()
   page.once('dialog', dialog => dialog.accept())
   await page.getByRole('dialog', { name: '记录详情' }).getByRole('button', { name: '删除记录' }).click()
   await expect(page.getByText('当月费用').locator('..')).toContainText('¥20.00')
