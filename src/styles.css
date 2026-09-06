@@ -91,3 +91,13 @@ table { width: 100%; border-collapse: collapse; background: white; } th, td { te
 .analysis-months a, .analysis-breakdown a { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; color: inherit; text-decoration: none; }
 .analysis-months strong, .analysis-breakdown strong { text-align: right; }
 @media (max-width: 600px) { .analysis-filters > label, .analysis-filters > button { flex: 1 1 100%; } .analysis-months a, .analysis-breakdown a { align-items: flex-start; flex-direction: column; } .analysis-months strong, .analysis-breakdown strong { text-align: left; } }
+
+.vehicles-heading, .vehicles-actions, .vehicle-primary-actions, .vehicle-more > div, .vehicle-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vehicles-heading { justify-content: space-between; margin-bottom: 16px; }
+.vehicles-heading p { margin: 6px 0 0; }
+.vehicle-tags { margin-bottom: 12px; } .vehicle-tags strong { color: #174f47; } .vehicle-tags span { color: #60706c; }
+.vehicle-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 16px 0; } .vehicle-summary p { margin: 0; color: #60706c; font-size: 13px; } .vehicle-summary strong { display: block; color: #182522; font-size: 16px; margin-top: 3px; }
+.vehicle-primary-actions button, .vehicle-more button { min-height: 44px; } .vehicle-more { margin-top: 12px; } .vehicle-more summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; } .vehicle-more > div { margin-top: 8px; }
+.danger { color: #a41d2d; border-color: #d7a5ad; } .danger:hover { background: #fff0f1; }
+.vehicle-dialog-backdrop { position: fixed; z-index: 10; inset: 0; display: flex; justify-content: flex-end; background: #14211d66; } .vehicle-dialog { width: min(680px, 100%); height: 100dvh; overflow: auto; box-sizing: border-box; padding: 24px max(24px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)); background: white; box-shadow: -8px 0 24px #0003; } .vehicle-dialog .form { max-width: none; } .dialog-close { min-height: 44px; margin-bottom: 12px; }
+@media (max-width: 600px) { .vehicles-heading { align-items: flex-start; flex-direction: column; } .vehicles-actions { width: 100%; } .vehicles-actions button { flex: 1 1 140px; min-height: 44px; } .vehicle-list { grid-template-columns: 1fr; } .vehicle-summary { grid-template-columns: 1fr 1fr; } .vehicle-primary-actions button { flex: 1 1 130px; } .vehicle-dialog { width: 100%; padding-left: max(20px, env(safe-area-inset-left)); } }

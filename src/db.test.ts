@@ -21,6 +21,15 @@ describe('CarDb', () => {
     await database.saveVehicle(vehicle('v2', '家庭用车'))
     await database.setDefaultVehicle('v2')
     expect((await database.vehicles.filter(item => item.isDefault).toArray()).map(item => item.id)).toEqual(['v2'])
+    expect(await database.settings.get('app')).toMatchObject({ defaultVehicleId: 'v2', selectedVehicleId: undefined })
+  })
+
+  it('keeps legacy vehicle fields and creation time while editing', async () => {
+    const database = createDb()
+    await database.saveVehicle({ ...vehicle('v1'), brandModel: '旧型号', plateNumber: '京A1' })
+    const before = await database.vehicles.get('v1')
+    await database.saveVehicle({ ...vehicle('v1', '新名称'), plateNumber: '京A2' })
+    expect(await database.vehicles.get('v1')).toMatchObject({ name: '新名称', plateNumber: '京A2', brandModel: '旧型号', createdAt: before?.createdAt })
   })
 
   it('deletes a vehicle and all of its records atomically', async () => {
@@ -31,5 +40,14 @@ describe('CarDb', () => {
     expect(await database.vehicles.count()).toBe(0)
     expect(await database.records.count()).toBe(0)
     expect(await database.settings.get('app')).toBeUndefined()
+  })
+
+  it('promotes a stable replacement when deleting the default vehicle', async () => {
+    const database = createDb()
+    await database.saveVehicle(vehicle('v1'))
+    await database.saveVehicle(vehicle('v2', '第二辆车'))
+    await database.removeVehicle('v1')
+    expect(await database.vehicles.get('v2')).toMatchObject({ isDefault: true })
+    expect(await database.settings.get('app')).toMatchObject({ defaultVehicleId: 'v2', selectedVehicleId: 'v2' })
   })
 })

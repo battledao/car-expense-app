@@ -20,11 +20,14 @@ export class CarDb extends Dexie {
   async saveVehicle(input: Omit<Vehicle, 'createdAt' | 'updatedAt' | 'isDefault'> & { isDefault?: boolean }) {
     const existing = await this.vehicles.get(input.id)
     const count = await this.vehicles.count()
-    const vehicle: Vehicle = { ...input, isDefault: input.isDefault ?? existing?.isDefault ?? count === 0, createdAt: existing?.createdAt ?? now(), updatedAt: now() }
+    const vehicle: Vehicle = { ...existing, ...input, isDefault: input.isDefault ?? existing?.isDefault ?? count === 0, createdAt: existing?.createdAt ?? now(), updatedAt: now() }
     await this.transaction('rw', this.vehicles, this.settings, async () => {
       if (vehicle.isDefault) await this.vehicles.toCollection().modify({ isDefault: false })
       await this.vehicles.put(vehicle)
-      if (vehicle.isDefault) await this.settings.put({ id: 'app', defaultVehicleId: vehicle.id, selectedVehicleId: vehicle.id })
+      if (vehicle.isDefault) {
+        const settings = await this.settings.get('app')
+        await this.settings.put({ id: 'app', ...settings, defaultVehicleId: vehicle.id, selectedVehicleId: count === 0 ? vehicle.id : input.isDefault ? undefined : settings?.selectedVehicleId })
+      }
     })
     return vehicle
   }
@@ -34,7 +37,8 @@ export class CarDb extends Dexie {
       if (!await this.vehicles.get(id)) throw new Error('车辆不存在')
       await this.vehicles.toCollection().modify({ isDefault: false })
       await this.vehicles.update(id, { isDefault: true, updatedAt: now() })
-      await this.settings.put({ id: 'app', defaultVehicleId: id, selectedVehicleId: id })
+      const settings = await this.settings.get('app')
+      await this.settings.put({ id: 'app', ...settings, defaultVehicleId: id, selectedVehicleId: undefined })
     })
   }
 
@@ -44,8 +48,8 @@ export class CarDb extends Dexie {
       await this.vehicles.delete(id)
       const settings = await this.settings.get('app')
       if (settings?.selectedVehicleId === id || settings?.defaultVehicleId === id) {
-        const next = await this.vehicles.filter(vehicle => vehicle.isDefault).first() ?? (await this.vehicles.toArray()).sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0]
-        if (next) { await this.vehicles.update(next.id, { isDefault: true }); await this.settings.put({ id: 'app', defaultVehicleId: next.id, selectedVehicleId: next.id }) }
+        const next = await this.vehicles.filter(vehicle => vehicle.isDefault).first() ?? (await this.vehicles.toArray()).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0]
+        if (next) { await this.vehicles.update(next.id, { isDefault: true, updatedAt: now() }); await this.settings.put({ id: 'app', defaultVehicleId: next.id, selectedVehicleId: settings?.selectedVehicleId === id ? next.id : settings?.selectedVehicleId }) }
         else await this.settings.delete('app')
       }
     })
