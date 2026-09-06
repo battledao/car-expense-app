@@ -722,3 +722,48 @@ it('explains when a selected vehicle has no energy records', async () => {
   expect(await screen.findByText('尚无充电记录，请先记录一次充电。')).toBeInTheDocument()
   expect(screen.queryByText('0.00 kWh/100km')).not.toBeInTheDocument()
 })
+
+it('shows a vehicle summary and safely edits its basic data', async () => {
+  await db.saveVehicle({ id: 'vehicle-summary', name: '家庭用车', energyType: 'fuel', initialMileage: 100, plateNumber: '京A12345', isDefault: true })
+  await db.saveRecord({ id: 'vehicle-summary-record', vehicleId: 'vehicle-summary', category: 'parking', amountCents: 2500, occurredAt: '2026-09-02T10:00', mileage: 180, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter initialEntries={['/vehicles']}><App /></MemoryRouter>)
+
+  expect(await screen.findByText('默认车辆')).toBeInTheDocument()
+  expect(screen.getByText('车牌号：京A12345')).toBeInTheDocument()
+  expect(screen.getByText('180 km')).toBeInTheDocument()
+  expect(screen.getByText('¥25.00')).toBeInTheDocument()
+  expect(screen.getByText('1 条')).toBeInTheDocument()
+  fireEvent.click(screen.getByText('更多操作'))
+  fireEvent.click(screen.getByRole('button', { name: '编辑车辆' }))
+  const dialog = await screen.findByRole('dialog', { name: '编辑车辆' })
+  fireEvent.change(within(dialog).getByLabelText('车辆名称'), { target: { value: '更新后的家庭用车' } })
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  fireEvent.click(within(dialog).getByRole('button', { name: '保存车辆' }))
+  expect(await screen.findByRole('heading', { name: '更新后的家庭用车' })).toBeInTheDocument()
+})
+
+it('uses a stronger deletion confirmation when a vehicle has records', async () => {
+  await db.saveVehicle({ id: 'vehicle-delete', name: '待删除车辆', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveRecord({ id: 'vehicle-delete-record', vehicleId: 'vehicle-delete', category: 'parking', amountCents: 1200, occurredAt: '2026-09-03T10:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter initialEntries={['/vehicles']}><App /></MemoryRouter>)
+
+  fireEvent.click(await screen.findByText('更多操作'))
+  fireEvent.click(screen.getByRole('button', { name: '删除车辆' }))
+  const dialog = await screen.findByRole('dialog', { name: '删除车辆确认' })
+  expect(within(dialog).getByText('关联记录：1 条')).toBeInTheDocument()
+  expect(within(dialog).getByText('关联费用：¥12.00')).toBeInTheDocument()
+  fireEvent.click(within(dialog).getByRole('button', { name: '继续删除' }))
+  expect(await screen.findByRole('button', { name: '确认永久删除' })).toBeInTheDocument()
+})
+
+it('deletes a vehicle without records from its first confirmation', async () => {
+  await db.saveVehicle({ id: 'empty-delete', name: '空白车辆', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  render(<MemoryRouter initialEntries={['/vehicles']}><App /></MemoryRouter>)
+
+  fireEvent.click(await screen.findByText('更多操作'))
+  fireEvent.click(screen.getByRole('button', { name: '删除车辆' }))
+  const dialog = await screen.findByRole('dialog', { name: '删除车辆确认' })
+  expect(within(dialog).getByRole('button', { name: '删除车辆' })).toBeInTheDocument()
+  fireEvent.click(within(dialog).getByRole('button', { name: '删除车辆' }))
+  expect(await screen.findByText('还没有车辆，请先添加第一辆车，再记录用车费用。')).toBeInTheDocument()
+})
