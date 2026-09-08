@@ -6,7 +6,7 @@ async function createRecord(page: Page, vehicleName = '详细记录验收车') {
   await page.getByLabel('车辆名称').fill(vehicleName)
   await page.getByLabel('初始里程（km）').fill('0')
   await page.getByRole('button', { name: '保存车辆' }).click()
-  await page.getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
   await page.getByLabel('金额（元）').fill('12')
   await page.getByLabel('发生时间').fill('2026-09-04T08:00')
   await page.getByLabel('停车场或地点').fill('测试停车场')

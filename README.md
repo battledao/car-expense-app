@@ -1,5 +1,9 @@
 # 爱车小精灵
 
+> 文档版本：V1.1
+> 最后更新：2026-09-08
+> 变更记录：V1.1 将产品版本同步至 PRD V1.9；补充正式视觉基准、响应式导航、UI 资源和当前 Release 风险说明。
+
 “爱车小精灵”是一款面向个人车主的用车费用记录与分析应用。项目当前是基于 React 的本地响应式 Web 应用，长期目标是形成可稳定发布到 TestFlight，并最终通过 Apple App Store 审核的正式 iOS 产品。
 
 > 当前阶段说明：仓库暂未包含 Xcode、Swift 或原生 iOS 工程，因此现阶段构建产物不能直接上传 TestFlight 或 App Store。涉及 iOS 技术路线、数据迁移、环境隔离、Signing 和发布配置的改造，需先完成影响评估后再实施。
@@ -15,6 +19,7 @@ GitHub：<https://github.com/battledao/car-expense-app>
 - 基于浏览器 IndexedDB 的本地数据持久化。
 - 完整 JSON 备份导出、校验、合并导入和覆盖恢复。
 - 电脑与手机浏览器响应式布局。
+- 已按 PRD V1.9 完成首页、用车记账、数据分析及车辆管理的统一浅雾白／青绿色视觉系统；桌面端使用侧边导航，手机端使用五项底部导航和“更多”入口。
 
 详细产品范围及验收标准以 [PRD.md](./PRD.md) 为准。
 
@@ -22,18 +27,21 @@ GitHub：<https://github.com/battledao/car-expense-app>
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 产品版本 | PRD V1.7 |
+| 产品版本 | PRD V1.9 |
 | Web 包版本 | 0.1.0 |
 | 前端 | React、TypeScript、Vite |
 | 路由 | React Router |
 | 本地数据库 | IndexedDB、Dexie |
 | 数据校验 | Zod |
 | 图表 | Recharts |
+| 图标 | Phosphor Icons（本地 npm 依赖） |
 | 单元与组件测试 | Vitest、Testing Library、jsdom |
 | 端到端测试 | Playwright |
 | iOS 原生工程 | 尚未建立 |
 | Xcode / Swift 版本 | 尚未确定 |
 | iOS Deployment Target | 尚未确定 |
+
+本轮 UI 仅调整 React 组件与 CSS，并新增一个经过生成授权的本地 WebP 装饰资源；未引入网络服务、系统权限、数据库 schema 迁移、敏感配置或用户数据格式变更。
 | Bundle Identifier | 尚未确定 |
 | TestFlight / App Store 配置 | 尚未建立 |
 | Backend / 云数据库 | 当前没有 |
