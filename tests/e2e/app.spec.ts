@@ -10,7 +10,7 @@ test('can navigate all primary modules and create a vehicle', async ({ page }) =
   await page.getByRole('button', { name: '保存车辆' }).click()
   await expect(page.getByRole('heading', { name: '测试燃油车' })).toBeVisible()
   await expect(page.getByText('默认车辆')).toBeVisible()
-  await page.getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
   await page.getByLabel('金额（元）').fill('20')
   await page.getByRole('button', { name: '保存并查看记录' }).click()
   await expect(page.getByText('记录数量').locator('..')).toContainText('1 笔')
@@ -24,12 +24,12 @@ test('sorts detailed records by date ascending by default and can switch to desc
   await page.getByLabel('初始里程（km）').fill('0')
   await page.getByRole('button', { name: '保存车辆' }).click()
 
-  await page.getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
   await page.getByLabel('金额（元）').fill('10')
   await page.getByLabel('发生时间').fill('2026-01-02T12:00')
   await page.getByRole('button', { name: '保存并查看记录' }).click()
 
-  await page.getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
   await page.getByLabel('金额（元）').fill('20')
   await page.getByLabel('发生时间').fill('2026-01-01T12:00')
   await page.getByRole('button', { name: '保存并查看记录' }).click()
@@ -53,7 +53,7 @@ test('saves and restores a selected fuel grade', async ({ page }) => {
   await page.getByLabel('车辆名称').fill('油品测试车')
   await page.getByLabel('初始里程（km）').fill('0')
   await page.getByRole('button', { name: '保存车辆' }).click()
-  await page.getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
   await page.getByRole('button', { name: '加油' }).click()
   await page.getByLabel('金额（元）').fill('100')
   await page.getByLabel('当前里程（km）').fill('1000')
@@ -72,7 +72,7 @@ test('adapts energy scenes by vehicle type and supports keyboard scene selection
   await page.getByLabel('能源类型').selectOption('electric')
   await page.getByLabel('初始里程（km）').fill('0')
   await page.getByRole('button', { name: '保存车辆' }).click()
-  await page.getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
 
   await expect(page.getByRole('button', { name: '加油' })).toHaveCount(0)
   const charge = page.getByRole('button', { name: '充电' })
@@ -96,7 +96,7 @@ test('keeps the primary record fields from overlapping at a medium desktop width
   await page.getByLabel('车辆名称').fill('布局测试车')
   await page.getByLabel('初始里程（km）').fill('0')
   await page.getByRole('button', { name: '保存车辆' }).click()
-  await page.getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
 
   const [amount, date, mileage] = await Promise.all([
     page.getByLabel('金额（元）').boundingBox(),
@@ -165,7 +165,7 @@ test('records, edits and deletes a dated expense from the calendar', async ({ pa
   await page.getByLabel('车辆名称').fill('日历流程车')
   await page.getByLabel('初始里程（km）').fill('0')
   await page.getByRole('button', { name: '保存车辆' }).click()
-  await page.getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
   await page.getByLabel('金额（元）').fill('12')
   await page.getByLabel('发生时间').fill('2026-08-03T08:00')
   await page.getByRole('button', { name: '保存并查看记录' }).click()
@@ -206,7 +206,7 @@ for (const deviceName of ['iPhone 14', 'Galaxy S9+']) {
       await page.getByLabel('初始里程（km）').fill('0')
       await page.getByRole('button', { name: '保存车辆' }).click()
 
-      await page.getByRole('button', { name: '记一笔', exact: true }).click()
+      await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
       await page.getByLabel('金额（元）').fill('18')
       await page.getByLabel('发生时间').fill('2026-09-04T08:00')
       await page.getByRole('button', { name: '保存并查看记录' }).click()
