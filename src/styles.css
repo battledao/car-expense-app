@@ -115,6 +115,7 @@ body { background: var(--ui-bg); color: var(--ui-text); }
 .app-shell main { min-width: 0; padding: 0 36px 48px; }
 .app-shell .global-header { display: flex; align-items: center; gap: 12px; min-height: 80px; border-bottom: 1px solid var(--ui-line); }
 .app-shell .global-header select { width: min(250px, 38vw); min-height: 42px; padding: 0 12px; border: 1px solid #b9dbd8; border-radius: 12px; color: var(--ui-text); background: #f5fbfb; }
+.app-shell .global-header .more-return { flex: 0 0 42px; }
 .app-shell .header-add, .app-shell .header-data { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; border: 1px solid transparent; border-radius: 12px; font-weight: 750; }
 .app-shell .header-add { margin-left: auto; padding: 0 17px; color: #fff; background: var(--ui-teal); box-shadow: 0 7px 16px #087d7626; }
 .app-shell .header-add:hover { background: var(--ui-teal-strong); }
@@ -298,7 +299,7 @@ body { background: var(--ui-bg); color: var(--ui-text); }
 .more-section + .more-section { margin-top: 26px; }
 .more-section-title { margin: 0 0 11px; color: var(--ui-text); font-size: 15px; font-weight: 800; }
 .more-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.more-card { display: flex; min-height: 154px; align-items: flex-start; gap: 14px; padding: 20px; border: 1px solid var(--ui-line); border-radius: 18px; color: var(--ui-text); background: linear-gradient(145deg, #fff, #fbfefe); box-shadow: var(--ui-shadow); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.more-card { display: flex; min-height: 154px; align-items: flex-start; gap: 14px; padding: 20px; border: 1px solid var(--ui-line); border-radius: 18px; color: var(--ui-text); background: linear-gradient(145deg, #fff, #fbfefe); box-shadow: var(--ui-shadow); text-decoration: none; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
 .more-card:hover { transform: translateY(-2px); border-color: #9cd7d3; box-shadow: 0 15px 30px #14304014; }
 .more-card:focus-visible { outline: 3px solid #55a9e5; outline-offset: 3px; }
 .more-card--wide { grid-column: 1 / -1; min-height: 132px; }

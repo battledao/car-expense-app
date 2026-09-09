@@ -18,6 +18,7 @@ test('V1.10 mobile more hub exposes three clear cards without global controls', 
   await expect(page.getByRole('link', { name: /车辆管理.*还没有车辆/ })).toBeVisible()
   await expect(page.getByRole('link', { name: /能耗统计.*添加车辆后可使用/ })).toBeVisible()
   await expect(page.getByRole('link', { name: /数据管理.*仅保存在本机/ })).toBeVisible()
+  expect(await page.locator('.more-card').evaluateAll(cards => cards.every(card => getComputedStyle(card).textDecorationLine === 'none'))).toBe(true)
   await expect(page.locator('.global-header')).toBeHidden()
   await expect(page.getByLabel('手机主导航').getByRole('link', { name: '更多' })).toHaveAttribute('aria-current', 'page')
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
@@ -33,13 +34,34 @@ test('V1.10 more hub reflects vehicle state and preserves the navigation return 
 
   await page.getByRole('link', { name: /车辆管理.*共 1 辆.*默认：城市通勤车/ }).click()
   await expect(page).toHaveURL(/\/vehicles$/)
+  await expect(page.locator('.global-header > .more-return')).toBeVisible()
+  await expect(page.locator('section.vehicles-page > .more-return')).toHaveCount(0)
+  const returnBox = await page.locator('.global-header > .more-return').boundingBox()
+  const vehicleSelectBox = await page.locator('.global-header select').boundingBox()
+  expect(Math.abs((returnBox?.y ?? 0) - (vehicleSelectBox?.y ?? 0))).toBeLessThanOrEqual(1)
+  await expect(page.getByRole('button', { name: '返回更多' })).toBeVisible()
   await expect(page.getByLabel('手机主导航').getByRole('link', { name: '更多' })).toHaveAttribute('aria-current', 'page')
-  await page.goBack()
+  await page.getByRole('button', { name: '返回更多' }).click()
+  await expect(page).toHaveURL(/\/more$/)
+
+  await page.getByRole('link', { name: /能耗统计.*查看城市通勤车的油耗数据/ }).click()
+  await expect(page).toHaveURL(/\/energy$/)
+  await expect(page.locator('.global-header > .more-return')).toBeVisible()
+  await expect(page.locator('section.energy-page > .more-return')).toHaveCount(0)
+  await page.getByRole('button', { name: '返回更多' }).click()
   await expect(page).toHaveURL(/\/more$/)
 
   await page.getByRole('link', { name: /数据管理/ }).click()
   await expect(page).toHaveURL(/\/vehicles\?data=1$/)
   await expect(page.getByRole('heading', { name: '数据管理' })).toBeVisible()
+  await expect(page.locator('.global-header > .more-return')).toBeVisible()
+  await expect(page.locator('section.vehicles-page > .more-return')).toHaveCount(0)
+  await page.getByRole('button', { name: '返回更多' }).click()
+  await expect(page).toHaveURL(/\/more$/)
+
+  await page.goto('/vehicles')
+  await expect(page.locator('.global-header > .more-return')).toHaveCount(0)
+  await expect(page.locator('section.vehicles-page > .more-return')).toHaveCount(0)
 })
 
 test('V1.10 more hub stays readable without horizontal overflow across supported widths', async ({ page }) => {
