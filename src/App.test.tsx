@@ -32,6 +32,35 @@ it('shows all seven primary navigation items', () => {
   expect(navigation.querySelectorAll('svg')).toHaveLength(7)
 })
 
+it('renders the V1.10 more hub with real vehicle and energy context', async () => {
+  await db.saveVehicle({ id: 'more-default', name: '城市通勤车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveVehicle({ id: 'more-weekend', name: '周末出行车', energyType: 'electric', initialMileage: 0 })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'more-default', defaultVehicleId: 'more-default' })
+  render(<MemoryRouter initialEntries={['/more']}><App /></MemoryRouter>)
+
+  expect(await screen.findByRole('heading', { name: '更多' })).toBeInTheDocument()
+  expect(screen.getByText('车辆与用车')).toBeInTheDocument()
+  expect(screen.getByText('数据与安全')).toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: /车辆管理.*共 2 辆.*默认：城市通勤车/ })).toHaveAttribute('href', '/vehicles')
+  expect(await screen.findByRole('link', { name: /能耗统计.*查看城市通勤车的油耗数据/ })).toHaveAttribute('href', '/energy')
+  expect(screen.getByRole('link', { name: /数据管理.*仅保存在本机/ })).toHaveAttribute('href', '/vehicles?data=1')
+  expect(screen.queryByRole('link', { name: /为当前车辆记一笔/ })).not.toBeInTheDocument()
+})
+
+it('explains the more hub empty and all-vehicle energy states without fake values', async () => {
+  render(<MemoryRouter initialEntries={['/more']}><App /></MemoryRouter>)
+  expect(await screen.findByText('还没有车辆')).toBeInTheDocument()
+  expect(screen.getByText('添加车辆后可使用')).toBeInTheDocument()
+  cleanup()
+
+  await db.saveVehicle({ id: 'more-all', name: '全局测试车', energyType: 'hybrid', initialMileage: 0, isDefault: true })
+  render(<MemoryRouter initialEntries={['/more']}><App /></MemoryRouter>)
+  await screen.findByText('查看全局测试车的能耗数据')
+  fireEvent.change(screen.getByLabelText('当前车辆'), { target: { value: 'all' } })
+  expect(await screen.findByText('进入后选择一辆车')).toBeInTheDocument()
+  expect(screen.queryByText(/0(?:\.00)?s*(?:L|kWh)/)).not.toBeInTheDocument()
+})
+
 it('reads analysis filters from the URL, validates custom dates and clears filters', async () => {
   await db.saveVehicle({ id: 'analysis-filters', name: '分析筛选车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-11&end=2026-01-10&category=parking']}><App /></MemoryRouter>)
