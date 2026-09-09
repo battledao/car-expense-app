@@ -94,3 +94,14 @@ test('returns a desktop more child page to the mobile more hub after a breakpoin
   await expect(page.getByRole('heading', { name: '更多' })).toBeVisible()
   await expect(page.getByLabel('手机主导航').getByRole('link', { name: '更多' })).toHaveAttribute('aria-current', 'page')
 })
+
+test('returns the mobile more hub to desktop vehicle management after a breakpoint change', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 932 })
+  await page.goto('/more')
+  await expect(page.getByRole('heading', { name: '更多' })).toBeVisible()
+
+  await page.setViewportSize({ width: 1024, height: 932 })
+  await expect(page).toHaveURL(/\/vehicles$/)
+  await expect(page.getByRole('heading', { name: '车辆管理' })).toBeVisible()
+  await expect(page.locator('.desktop-nav')).toBeVisible()
+})
