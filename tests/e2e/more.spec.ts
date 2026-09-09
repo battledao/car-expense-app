@@ -6,6 +6,7 @@ async function addVehicle(page: import('@playwright/test').Page, name: string) {
   await page.getByLabel('车辆名称').fill(name)
   await page.getByLabel('初始里程（km）').fill('1000')
   await page.getByRole('button', { name: '保存车辆' }).click()
+  await expect(page.getByRole('heading', { name })).toBeVisible()
 }
 
 test('V1.10 mobile more hub exposes three clear cards without global controls', async ({ page }) => {
@@ -40,7 +41,7 @@ test('V1.10 more hub reflects vehicle state and preserves the navigation return 
   const vehicleSelectBox = await page.locator('.global-header select').boundingBox()
   expect(Math.abs((returnBox?.y ?? 0) - (vehicleSelectBox?.y ?? 0))).toBeLessThanOrEqual(1)
   await expect(page.getByRole('button', { name: '返回更多' })).toBeVisible()
-  await expect(page.getByLabel('手机主导航').getByRole('link', { name: '更多' })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByLabel('手机主导航').getByRole('link', { name: '更多' })).not.toHaveAttribute('aria-current', 'page')
   await page.getByRole('button', { name: '返回更多' }).click()
   await expect(page).toHaveURL(/\/more$/)
 
@@ -81,4 +82,15 @@ test('V1.10 more hub stays readable without horizontal overflow across supported
   const secondCard = await cards.nth(1).boundingBox()
   expect(firstCard?.y).toBeGreaterThan(0)
   expect((secondCard?.y ?? 844) + (secondCard?.height ?? 0)).toBeLessThan(764)
+})
+
+test('returns a desktop more child page to the mobile more hub after a breakpoint change', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 932 })
+  await page.goto('/vehicles')
+  await expect(page.getByRole('heading', { name: '车辆管理' })).toBeVisible()
+
+  await page.setViewportSize({ width: 390, height: 932 })
+  await expect(page).toHaveURL(/\/more$/)
+  await expect(page.getByRole('heading', { name: '更多' })).toBeVisible()
+  await expect(page.getByLabel('手机主导航').getByRole('link', { name: '更多' })).toHaveAttribute('aria-current', 'page')
 })
