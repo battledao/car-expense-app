@@ -289,3 +289,36 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .vehicles-page .vehicles-actions button { flex: 1; }
   .vehicles-page .vehicle-list { grid-template-columns: 1fr; }
 }
+
+/* More: a quiet, task-first hub that reuses the V1.9 teal visual system. */
+.more-page { max-width: 920px; padding-top: 30px; }
+.more-page-header { margin-bottom: 28px; }
+.more-page-header h2 { margin: 0; color: var(--ui-text); font-size: 29px; letter-spacing: -.045em; }
+.more-page-header p { margin: 7px 0 0; color: var(--ui-muted); }
+.more-section + .more-section { margin-top: 26px; }
+.more-section-title { margin: 0 0 11px; color: var(--ui-text); font-size: 15px; font-weight: 800; }
+.more-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.more-card { display: flex; min-height: 154px; align-items: flex-start; gap: 14px; padding: 20px; border: 1px solid var(--ui-line); border-radius: 18px; color: var(--ui-text); background: linear-gradient(145deg, #fff, #fbfefe); box-shadow: var(--ui-shadow); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.more-card:hover { transform: translateY(-2px); border-color: #9cd7d3; box-shadow: 0 15px 30px #14304014; }
+.more-card:focus-visible { outline: 3px solid #55a9e5; outline-offset: 3px; }
+.more-card--wide { grid-column: 1 / -1; min-height: 132px; }
+.more-card-icon { display: inline-flex; width: 48px; height: 48px; flex: 0 0 48px; align-items: center; justify-content: center; border-radius: 15px; }
+.more-card-icon--teal { color: var(--ui-teal-strong); background: #e4f6f4; }
+.more-card-icon--blue { color: #257ed6; background: #e6f2ff; }
+.more-card-icon--violet { color: #7460bd; background: #efebff; }
+.more-card-copy { display: grid; min-width: 0; gap: 5px; }
+.more-card-copy strong { font-size: 17px; line-height: 1.35; }
+.more-card-copy small { color: var(--ui-muted); font-size: 13px; line-height: 1.45; }
+.more-card-status { margin-top: 5px; color: var(--ui-teal-strong); font-size: 13px; font-weight: 750; line-height: 1.45; }
+.more-card-chevron { margin: 14px 0 0 auto; flex: 0 0 auto; color: #9ba7ae; }
+
+@media (max-width: 767px) {
+  .app-shell.is-more .global-header { display: none; }
+  .more-page { padding-top: 24px; }
+  .more-page-header { margin-bottom: 24px; }
+  .more-page-header h2 { font-size: 26px; }
+  .more-grid { grid-template-columns: 1fr; gap: 11px; }
+  .more-card, .more-card--wide { min-height: 124px; padding: 17px; border-radius: 16px; }
+  .more-card--wide { grid-column: auto; }
+  .more-card-icon { width: 45px; height: 45px; flex-basis: 45px; border-radius: 14px; }
+}
