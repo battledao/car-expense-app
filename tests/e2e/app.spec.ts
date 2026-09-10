@@ -213,6 +213,14 @@ for (const deviceName of ['iPhone 14', 'Galaxy S9+']) {
       await page.getByRole('link', { name: '费用日历' }).click()
       await page.getByLabel('费用日历月份').fill('2026-09')
 
+      const summaryCards = page.locator('.calendar-summary > .metric')
+      const summaryBoxes = await Promise.all([0, 1, 2].map(index => summaryCards.nth(index).boundingBox()))
+      expect(summaryBoxes.every((box): box is NonNullable<typeof box> => box !== null)).toBe(true)
+      expect(summaryBoxes[0].y).toBeCloseTo(summaryBoxes[1].y, 0)
+      expect(summaryBoxes[1].y).toBeCloseTo(summaryBoxes[2].y, 0)
+      expect(summaryBoxes[0].x + summaryBoxes[0].width).toBeLessThanOrEqual(summaryBoxes[1].x)
+      expect(summaryBoxes[1].x + summaryBoxes[1].width).toBeLessThanOrEqual(summaryBoxes[2].x)
+
       const panels = page.locator('.calendar-layout > .panel')
       const [calendarPanel, detailPanel] = await Promise.all([panels.nth(0).boundingBox(), panels.nth(1).boundingBox()])
       expect(calendarPanel).not.toBeNull()
