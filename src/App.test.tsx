@@ -32,18 +32,22 @@ it('shows all seven primary navigation items', () => {
   expect(navigation.querySelectorAll('svg')).toHaveLength(7)
 })
 
-it('renders the V1.10 more hub with real vehicle and energy context', async () => {
+it('renders the V1.11 more hub with concise real vehicle and energy context', async () => {
   await db.saveVehicle({ id: 'more-default', name: '城市通勤车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   await db.saveVehicle({ id: 'more-weekend', name: '周末出行车', energyType: 'electric', initialMileage: 0 })
   await db.settings.put({ id: 'app', selectedVehicleId: 'more-default', defaultVehicleId: 'more-default' })
   render(<MemoryRouter initialEntries={['/more']}><App /></MemoryRouter>)
 
-  expect(await screen.findByRole('heading', { name: '更多' })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: '更多' })).not.toBeInTheDocument()
+  expect(screen.queryByText('管理车辆、能耗与本地数据')).not.toBeInTheDocument()
   expect(screen.getByText('车辆与用车')).toBeInTheDocument()
-  expect(screen.getByText('数据与安全')).toBeInTheDocument()
+  expect(screen.getByText('数据与备份')).toBeInTheDocument()
   expect(await screen.findByRole('link', { name: /车辆管理.*共 2 辆.*默认：城市通勤车/ })).toHaveAttribute('href', '/vehicles')
   expect(await screen.findByRole('link', { name: /能耗统计.*查看城市通勤车的油耗数据/ })).toHaveAttribute('href', '/energy')
-  expect(screen.getByRole('link', { name: /数据管理.*仅保存在本机/ })).toHaveAttribute('href', '/vehicles?data=1')
+  expect(screen.getByRole('link', { name: /数据管理.*本机数据.*导出备份与导入恢复/ })).toHaveAttribute('href', '/vehicles?data=1')
+  expect(screen.queryByText('管理车辆资料与默认车辆')).not.toBeInTheDocument()
+  expect(screen.queryByText('查看油耗、电耗与能源成本')).not.toBeInTheDocument()
+  expect(screen.queryByText('仅保存在本机')).not.toBeInTheDocument()
   expect(screen.queryByRole('link', { name: /为当前车辆记一笔/ })).not.toBeInTheDocument()
 })
 
@@ -361,9 +365,9 @@ it('summarizes all matching records, sorts ties stably and loads records in page
   expect(screen.getByText('已展示 30 / 共 65 条')).toBeInTheDocument()
 
   fireEvent.click(screen.getByRole('button', { name: '加载更多记录' }))
-  expect(within(table).getAllByRole('row')).toHaveLength(61)
+  await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(61))
   fireEvent.click(screen.getByRole('button', { name: '加载更多记录' }))
-  expect(within(table).getAllByRole('row')).toHaveLength(66)
+  await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(66))
   expect(screen.queryByRole('button', { name: '加载更多记录' })).not.toBeInTheDocument()
 
   fireEvent.change(screen.getByLabelText('排序'), { target: { value: 'amount-desc' } })
