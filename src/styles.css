@@ -329,3 +329,8 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .calendar-page .calendar-summary .metric span { font-size: 12px; }
   .calendar-page .calendar-summary .metric strong { margin-top: 7px; font-size: clamp(16px, 4.8vw, 20px); letter-spacing: -.04em; }
 }
+
+/* Analysis V1.12: details are available on demand without competing with primary actions. */
+.analysis-page .analysis-expand { min-height: 42px; margin-top: 12px; border-color: #add8d4; color: var(--ui-teal-strong); background: #effaf9; font-weight: 750; }
+.analysis-page .analysis-other-category { color: var(--ui-muted); }
+.analysis-page .analysis-other-category strong { color: var(--ui-text); }

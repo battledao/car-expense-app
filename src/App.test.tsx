@@ -112,6 +112,7 @@ it('shows a continuous analysis trend with zero periods and record drill-down li
   render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-03']}><App /></MemoryRouter>)
 
   expect(await screen.findByRole('img', { name: '费用趋势图' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '查看完整趋势' })).not.toBeInTheDocument()
   const zeroDay = screen.getByRole('link', { name: '2026-01-02，¥0.00，0笔' })
   expect(zeroDay).toHaveAttribute('href', expect.stringContaining('start=2026-01-02'))
   expect(zeroDay).toHaveAttribute('href', expect.stringContaining('end=2026-01-02'))
@@ -133,6 +134,35 @@ it('shows monthly totals, counts and honest month-over-month comparisons', async
   expect(within(panel).getByRole('link', { name: '2026-04，¥10.00，1笔，较上月暂无可比数据' })).toBeInTheDocument()
 })
 
+it('shows analysis previews and expands complete trend, month and category details on demand', async () => {
+  await db.saveVehicle({ id: 'analysis-expand', name: '按需展开车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-expand', defaultVehicleId: 'analysis-expand' })
+  const base = { vehicleId: 'analysis-expand', excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  const records = [
+    ['parking', '2026-01-10T10:00', 1000], ['wash', '2026-02-10T10:00', 2000], ['toll', '2026-03-10T10:00', 3000],
+    ['maintenance', '2026-04-10T10:00', 4000], ['insurance', '2026-05-10T10:00', 5000], ['fine', '2026-06-10T10:00', 6000],
+  ] as const
+  for (const [category, occurredAt, amountCents] of records) await db.saveRecord({ ...base, id: `expand-${category}`, category, occurredAt, amountCents })
+
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-06-30']}><App /></MemoryRouter>)
+
+  const trendPanel = (await screen.findByRole('heading', { name: '费用趋势' })).closest('.panel') as HTMLElement
+  const monthsPanel = screen.getByRole('heading', { name: '月份费用对比' }).closest('.panel') as HTMLElement
+  const categoriesPanel = screen.getByRole('heading', { name: '费用类别构成' }).closest('.panel') as HTMLElement
+  expect(within(trendPanel).queryByRole('link', { name: /2026-01/ })).not.toBeInTheDocument()
+  expect(within(monthsPanel).getAllByRole('link')).toHaveLength(3)
+  expect(within(categoriesPanel).getAllByRole('link')).toHaveLength(3)
+  expect(within(categoriesPanel).getByText(/其他类别/)).toHaveTextContent('3 类')
+
+  fireEvent.click(within(trendPanel).getByRole('button', { name: '查看完整趋势' }))
+  fireEvent.click(within(monthsPanel).getByRole('button', { name: '查看全部月份' }))
+  fireEvent.click(within(categoriesPanel).getByRole('button', { name: '查看全部类别' }))
+  expect(within(trendPanel).getByRole('link', { name: /2026-01/ })).toBeInTheDocument()
+  expect(within(monthsPanel).getAllByRole('link')).toHaveLength(6)
+  expect(within(categoriesPanel).getAllByRole('link')).toHaveLength(6)
+  expect(within(categoriesPanel).queryByText('其他类别')).not.toBeInTheDocument()
+  expect(within(trendPanel).getByRole('button', { name: '收起完整趋势' })).toHaveAttribute('aria-expanded', 'true')
+})
 it('shows category and all-vehicle amounts, counts, shares and drill-down links', async () => {
   await db.saveVehicle({ id: 'analysis-car-a', name: '分析车 A', energyType: 'fuel', initialMileage: 0, isDefault: true })
   await db.saveVehicle({ id: 'analysis-car-b', name: '分析车 B', energyType: 'electric', initialMileage: 0 })
@@ -145,6 +175,8 @@ it('shows category and all-vehicle amounts, counts, shares and drill-down links'
 
   render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-31']}><App /></MemoryRouter>)
 
+  const categoryPanel = (await screen.findByRole('heading', { name: '费用类别构成' })).closest('.panel') as HTMLElement
+  expect(within(categoryPanel).queryByRole('button', { name: '查看全部类别' })).not.toBeInTheDocument()
   const categoryLink = await screen.findByRole('link', { name: '停车，¥30.00，2笔，75%' })
   expect(categoryLink).toHaveAttribute('href', expect.stringContaining('category=parking'))
   const vehicleLink = screen.getByRole('link', { name: '分析车 A，¥30.00，2笔，75%' })
