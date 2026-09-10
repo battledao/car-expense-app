@@ -6,9 +6,11 @@ const vehicle = (id: string, overrides: Partial<Vehicle> = {}): Vehicle => ({ id
 const record = (mileage?: number, category: ExpenseRecord['category'] = 'parking'): ExpenseRecord => ({ id: crypto.randomUUID(), vehicleId: 'v1', category, amountCents: 100, occurredAt: '2026-01-01T00:00', mileage, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
 
 describe('vehicle form rules', () => {
-  it('validates required text, mileage precision and plate length', () => {
-    expect(vehicleFormErrors({ name: '  ', energyType: 'fuel', initialMileage: '1.25', plateNumber: 'x'.repeat(21) }, [])).toEqual({ name: '车辆名称需为 1～30 个字符。', initialMileage: '初始里程必须为最多 1 位小数的非负数。', plateNumber: '车牌号不能超过 20 个字符。' })
-    expect(vehicleFormErrors({ name: '测试车', energyType: 'fuel', initialMileage: '1.2', plateNumber: ' A 1 ' }, [])).toEqual({})
+  it('validates required text, mileage precision and mainland plate formats', () => {
+    expect(vehicleFormErrors({ name: '  ', energyType: 'fuel', initialMileage: '1.25', plateNumber: '粤A666666666' }, [])).toEqual({ name: '车辆名称需为 1～30 个字符。', initialMileage: '初始里程必须为最多 1 位小数的非负数。', plateNumber: '请输入有效的中国大陆民用车牌号。' })
+    for (const plateNumber of ['', '粤A12345', '粤AD12345', '粤A12345D']) expect(vehicleFormErrors({ name: '测试车', energyType: 'fuel', initialMileage: '1.2', plateNumber }, [])).toEqual({})
+    expect(vehicleFormErrors({ name: '测试车', energyType: 'fuel', initialMileage: '1.2', plateNumber: 'AA12345' }, [])).toMatchObject({ plateNumber: '请输入有效的中国大陆民用车牌号。' })
+    expect(vehicleFormErrors({ name: '测试车', energyType: 'fuel', initialMileage: '1.2', plateNumber: '粤A1234' }, [])).toMatchObject({ plateNumber: '请输入有效的中国大陆民用车牌号。' })
   })
 
   it('protects the historical minimum valid mileage', () => {
