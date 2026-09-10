@@ -9,23 +9,27 @@ async function addVehicle(page: import('@playwright/test').Page, name: string) {
   await expect(page.getByRole('heading', { name })).toBeVisible()
 }
 
-test('V1.10 mobile more hub exposes three clear cards without global controls', async ({ page }) => {
+test('V1.11 mobile more hub starts with task groups and concise status cards', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/more')
 
-  await expect(page.getByRole('heading', { name: '更多' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '更多' })).toHaveCount(0)
+  await expect(page.getByText('管理车辆、能耗与本地数据')).toHaveCount(0)
   await expect(page.getByText('车辆与用车')).toBeVisible()
-  await expect(page.getByText('数据与安全')).toBeVisible()
+  await expect(page.getByText('数据与备份')).toBeVisible()
   await expect(page.getByRole('link', { name: /车辆管理.*还没有车辆/ })).toBeVisible()
   await expect(page.getByRole('link', { name: /能耗统计.*添加车辆后可使用/ })).toBeVisible()
-  await expect(page.getByRole('link', { name: /数据管理.*仅保存在本机/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: /数据管理.*本机数据.*导出备份与导入恢复/ })).toBeVisible()
+  await expect(page.getByText('管理车辆资料与默认车辆')).toHaveCount(0)
+  await expect(page.getByText('查看油耗、电耗与能源成本')).toHaveCount(0)
+  await expect(page.getByText('仅保存在本机')).toHaveCount(0)
   expect(await page.locator('.more-card').evaluateAll(cards => cards.every(card => getComputedStyle(card).textDecorationLine === 'none'))).toBe(true)
   await expect(page.locator('.global-header')).toBeHidden()
   await expect(page.getByLabel('手机主导航').getByRole('link', { name: '更多' })).toHaveAttribute('aria-current', 'page')
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
 })
 
-test('V1.10 more hub reflects vehicle state and preserves the navigation return path', async ({ page }) => {
+test('V1.11 more hub reflects vehicle state and preserves the navigation return path', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await addVehicle(page, '城市通勤车')
   await page.goto('/more')
@@ -65,7 +69,7 @@ test('V1.10 more hub reflects vehicle state and preserves the navigation return 
   await expect(page.locator('section.vehicles-page > .more-return')).toHaveCount(0)
 })
 
-test('V1.10 more hub stays readable without horizontal overflow across supported widths', async ({ page }) => {
+test('V1.11 more hub stays readable and exposes the backup group in the mobile first viewport', async ({ page }) => {
   for (const width of [320, 375, 390, 414, 430, 768, 1024, 1280]) {
     await page.setViewportSize({ width, height: 844 })
     await page.goto('/more')
@@ -80,8 +84,11 @@ test('V1.10 more hub stays readable without horizontal overflow across supported
   const cards = page.locator('.more-card')
   const firstCard = await cards.nth(0).boundingBox()
   const secondCard = await cards.nth(1).boundingBox()
+  const backupHeading = await page.getByText('数据与备份').boundingBox()
+  const mobileNav = await page.getByLabel('手机主导航').boundingBox()
   expect(firstCard?.y).toBeGreaterThan(0)
   expect((secondCard?.y ?? 844) + (secondCard?.height ?? 0)).toBeLessThan(764)
+  expect((backupHeading?.y ?? 844) + (backupHeading?.height ?? 0)).toBeLessThan(mobileNav?.y ?? 0)
 })
 
 test('returns a desktop more child page to the mobile more hub after a breakpoint change', async ({ page }) => {
@@ -91,17 +98,34 @@ test('returns a desktop more child page to the mobile more hub after a breakpoin
 
   await page.setViewportSize({ width: 390, height: 932 })
   await expect(page).toHaveURL(/\/more$/)
-  await expect(page.getByRole('heading', { name: '更多' })).toBeVisible()
+  await expect(page.getByText('车辆与用车')).toBeVisible()
   await expect(page.getByLabel('手机主导航').getByRole('link', { name: '更多' })).toHaveAttribute('aria-current', 'page')
 })
 
 test('returns the mobile more hub to desktop vehicle management after a breakpoint change', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 932 })
   await page.goto('/more')
-  await expect(page.getByRole('heading', { name: '更多' })).toBeVisible()
+  await expect(page.getByText('车辆与用车')).toBeVisible()
 
   await page.setViewportSize({ width: 1024, height: 932 })
   await expect(page).toHaveURL(/\/vehicles$/)
   await expect(page.getByRole('heading', { name: '车辆管理' })).toBeVisible()
   await expect(page.locator('.desktop-nav')).toBeVisible()
+})
+
+test('keeps a direct desktop more route and a deliberately opened mobile child page stable', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 932 })
+  await page.goto('/more')
+  await expect(page).toHaveURL(/\/more$/)
+  await expect(page.getByText('车辆与用车')).toBeVisible()
+  await expect(page.locator('.desktop-nav')).toBeVisible()
+  await expect(page.locator('.global-header')).toBeVisible()
+
+  await page.setViewportSize({ width: 390, height: 932 })
+  await expect(page).toHaveURL(/\/more$/)
+  await page.getByRole('link', { name: /车辆管理.*还没有车辆/ }).click()
+  await expect(page).toHaveURL(/\/vehicles$/)
+  await page.setViewportSize({ width: 1024, height: 932 })
+  await expect(page).toHaveURL(/\/vehicles$/)
+  await expect(page.getByRole('heading', { name: '车辆管理' })).toBeVisible()
 })
