@@ -22,6 +22,29 @@ test('filters dashboard records by month and keeps the filter in detailed record
   await expect(page.getByText('总金额').locator('..')).toContainText('¥25.00')
 })
 
+test('formats the dashboard trend axis in yuan instead of internal cents', async ({ page }) => {
+  await page.goto('/vehicles')
+  await page.getByRole('button', { name: '新增车辆' }).click()
+  await page.getByLabel('车辆名称').fill('趋势金额测试车')
+  await page.getByLabel('初始里程（km）').fill('0')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.getByLabel('金额（元）').fill('9020')
+  await page.getByLabel('发生时间').fill('2026-09-15T12:00')
+  await page.getByRole('button', { name: '保存并查看记录' }).click()
+  await page.goto('/')
+  await page.getByLabel('首页月份').fill('2026-09')
+
+  const chart = page.getByRole('img', { name: '近六个月费用趋势图' })
+  await expect(chart.getByRole('application')).toContainText('¥2,500')
+  await expect(chart.getByRole('application')).not.toContainText('250000')
+
+  await page.goto('/analysis?range=all')
+  const analysisChart = page.getByRole('img', { name: '费用趋势图' })
+  await expect(analysisChart.getByRole('application')).toContainText('¥2,500')
+  await expect(analysisChart.getByRole('application')).not.toContainText('250000')
+})
+
 test('keeps the dashboard controls usable on a narrow screen', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 })
   await page.goto('/')
