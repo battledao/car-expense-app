@@ -75,5 +75,44 @@ for (const deviceName of ['iPhone 14', 'Galaxy S9+']) {
       await page.setViewportSize({ width: 844, height: 390 })
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
     })
+    test('shows three-item previews and expands complete analysis details without overflow', async ({ page }) => {
+      await page.goto('/vehicles')
+      await page.getByRole('button', { name: '新增车辆' }).click()
+      await page.getByLabel('车辆名称').fill(`${deviceName} 展开分析车`)
+      await page.getByLabel('初始里程（km）').fill('0')
+      await page.getByRole('button', { name: '保存车辆' }).click()
+
+      const entries = [
+        { category: '停车', amount: '10', occurredAt: '2026-01-10T10:00' },
+        { category: '洗车', amount: '20', occurredAt: '2026-02-10T10:00' },
+        { category: '保养', amount: '30', occurredAt: '2026-03-10T10:00' },
+        { category: '维修', amount: '40', occurredAt: '2026-04-10T10:00' },
+      ]
+      for (const entry of entries) {
+        await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
+        if (entry.category !== '停车') await page.getByRole('button', { name: entry.category, exact: true }).click()
+        await page.getByLabel('金额（元）').fill(entry.amount)
+        await page.getByLabel('发生时间').fill(entry.occurredAt)
+        await page.getByRole('button', { name: '保存并查看记录' }).click()
+      }
+
+      await page.goto('/analysis?range=custom&start=2026-01-01&end=2026-04-30')
+      const trendPoints = page.locator('.analysis-points a')
+      const monthPoints = page.locator('.analysis-months a')
+      const categoryPoints = page.locator('.analysis-breakdown').first().getByRole('link')
+      await expect(trendPoints).toHaveCount(3)
+      await expect(monthPoints).toHaveCount(3)
+      await expect(categoryPoints).toHaveCount(3)
+      await expect(page.getByText(/其他类别/)).toContainText('1 类')
+
+      await page.getByRole('button', { name: '查看完整趋势' }).click()
+      await page.getByRole('button', { name: '查看全部月份' }).click()
+      await page.getByRole('button', { name: '查看全部类别' }).click()
+      await expect(trendPoints).toHaveCount(4)
+      await expect(monthPoints).toHaveCount(4)
+      await expect(categoryPoints).toHaveCount(4)
+      await expect(page.getByRole('button', { name: '收起完整趋势' })).toHaveAttribute('aria-expanded', 'true')
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+    })
   })
 }
