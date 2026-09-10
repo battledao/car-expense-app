@@ -317,3 +317,15 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .more-card--wide { grid-column: auto; }
   .more-card-icon { width: 45px; height: 45px; flex-basis: 45px; border-radius: 14px; }
 }
+
+/* Calendar: related monthly indicators stay comparable in one compact row. */
+.calendar-page .calendar-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.calendar-page .calendar-summary .metric { min-width: 0; }
+.calendar-page .calendar-summary .metric strong { white-space: nowrap; }
+
+@media (max-width: 767px) {
+  .calendar-page .calendar-summary { gap: 8px; }
+  .calendar-page .calendar-summary .metric { padding: 13px 10px; }
+  .calendar-page .calendar-summary .metric span { font-size: 12px; }
+  .calendar-page .calendar-summary .metric strong { margin-top: 7px; font-size: clamp(16px, 4.8vw, 20px); letter-spacing: -.04em; }
+}
