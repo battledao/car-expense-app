@@ -27,6 +27,23 @@ test('manages vehicle cards, default vehicle, and basic edits', async ({ page })
   await expect(page.getByRole('heading', { name: '更新后的周末出行车' })).toBeVisible()
 })
 
+test('rejects malformed plates and normalizes valid new-energy plates before saving', async ({ page }) => {
+  await page.goto('/vehicles')
+  await page.getByRole('button', { name: '新增车辆' }).click()
+  await page.getByLabel('车辆名称').fill('车牌校验车')
+  await page.getByLabel('初始里程（km）').fill('0')
+  await page.getByLabel('车牌号').fill('粤A666666666')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+  await expect(page.getByText('请输入有效的中国大陆民用车牌号。')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: '新增车辆' })).toBeVisible()
+
+  const plate = page.getByLabel('车牌号')
+  await plate.fill('粤ad12345')
+  await expect(plate).toHaveValue('粤AD12345')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+  await expect(page.getByText('车牌号：粤AD12345')).toBeVisible()
+})
+
 test('keeps vehicle cards and primary actions inside an iPhone 14-sized viewport', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/vehicles')
