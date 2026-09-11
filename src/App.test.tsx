@@ -102,67 +102,58 @@ it('shows analysis summary, previous-period change and single-vehicle cost per k
   expect(screen.getByText('每公里综合成本').closest('.metric')).toHaveTextContent('¥0.30/km')
 })
 
-it('shows a continuous analysis trend with zero periods and record drill-down links', async () => {
+it('uses three analysis entry cards instead of rendering complete detail modules on the home page', async () => {
+  await db.saveVehicle({ id: 'analysis-cards', name: '卡片入口车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-cards', defaultVehicleId: 'analysis-cards' })
+  await db.saveRecord({ id: 'analysis-card-record', vehicleId: 'analysis-cards', category: 'parking', amountCents: 2000, occurredAt: '2026-01-10T10:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-31&category=parking']}><App /></MemoryRouter>)
+
+  const trend = await screen.findByRole('link', { name: /费用趋势/ })
+  expect(trend).toHaveAttribute('href', expect.stringContaining('/analysis/trend?'))
+  expect(trend).toHaveAttribute('href', expect.stringContaining('range=custom'))
+  expect(trend).toHaveAttribute('href', expect.stringContaining('vehicle=analysis-cards'))
+  expect(screen.getByRole('link', { name: /月份费用对比/ })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: /费用类别构成/ })).toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: '费用趋势图' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /查看完整趋势|查看全部月份|查看全部类别/ })).not.toBeInTheDocument()
+})
+
+it('shows the complete continuous trend and drill-down links in its own child page', async () => {
   await db.saveVehicle({ id: 'analysis-trend', name: '分析趋势车', energyType: 'fuel', initialMileage: 0, isDefault: true })
-  await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-trend', defaultVehicleId: 'analysis-trend' })
   const base = { vehicleId: 'analysis-trend', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
   await db.saveRecord({ ...base, id: 'trend-first', amountCents: 1000, occurredAt: '2026-01-01T10:00' })
   await db.saveRecord({ ...base, id: 'trend-last', amountCents: 2000, occurredAt: '2026-01-03T10:00' })
 
-  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-03']}><App /></MemoryRouter>)
+  render(<MemoryRouter initialEntries={['/analysis/trend?range=custom&start=2026-01-01&end=2026-01-03&vehicle=analysis-trend']}><App /></MemoryRouter>)
 
-  expect(await screen.findByRole('img', { name: '费用趋势图' })).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: '查看完整趋势' })).not.toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: '费用趋势' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '返回数据分析' })).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: '费用趋势图' })).toBeInTheDocument()
   const zeroDay = screen.getByRole('link', { name: '2026-01-02，¥0.00，0笔' })
   expect(zeroDay).toHaveAttribute('href', expect.stringContaining('start=2026-01-02'))
-  expect(zeroDay).toHaveAttribute('href', expect.stringContaining('end=2026-01-02'))
-  await waitFor(() => expect(zeroDay).toHaveAttribute('href', expect.stringContaining('vehicle=analysis-trend')))
+  expect(zeroDay).toHaveAttribute('href', expect.stringContaining('vehicle=analysis-trend'))
 })
 
-it('shows monthly totals, counts and honest month-over-month comparisons', async () => {
-  await db.saveVehicle({ id: 'analysis-months', name: '月份对比车', energyType: 'fuel', initialMileage: 0, isDefault: true })
-  await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-months', defaultVehicleId: 'analysis-months' })
-  const base = { vehicleId: 'analysis-months', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
-  await db.saveRecord({ ...base, id: 'month-jan', amountCents: 1000, occurredAt: '2026-01-10T10:00' })
-  await db.saveRecord({ ...base, id: 'month-feb', amountCents: 2000, occurredAt: '2026-02-10T10:00' })
-  await db.saveRecord({ ...base, id: 'month-apr', amountCents: 1000, occurredAt: '2026-04-10T10:00' })
+it('renders complete month and category details only on their own child pages', async () => {
+  await db.saveVehicle({ id: 'analysis-details', name: '子页分析车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  const base = { vehicleId: 'analysis-details', excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'detail-jan', category: 'parking', amountCents: 1000, occurredAt: '2026-01-10T10:00' })
+  await db.saveRecord({ ...base, id: 'detail-feb', category: 'wash', amountCents: 2000, occurredAt: '2026-02-10T10:00' })
+  await db.saveRecord({ ...base, id: 'detail-apr', category: 'maintenance', amountCents: 1000, occurredAt: '2026-04-10T10:00' })
 
-  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-04-30']}><App /></MemoryRouter>)
+  render(<MemoryRouter initialEntries={['/analysis/months?range=custom&start=2026-01-01&end=2026-04-30&vehicle=analysis-details']}><App /></MemoryRouter>)
+  expect(await screen.findByRole('heading', { name: '月份费用对比' })).toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: '2026-03，¥0.00，0笔，较上月-¥20.00 · -100.0%' })).toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: '2026-04，¥10.00，1笔，较上月暂无可比较数据' })).toBeInTheDocument()
 
-  const panel = (await screen.findByRole('heading', { name: '月份费用对比' })).closest('.panel') as HTMLElement
-  expect(await within(panel).findByRole('link', { name: '2026-03，¥0.00，0笔，较上月-¥20.00 · -100.0%' })).toBeInTheDocument()
-  expect(within(panel).getByRole('link', { name: '2026-04，¥10.00，1笔，较上月暂无可比数据' })).toBeInTheDocument()
+  render(<MemoryRouter initialEntries={['/analysis/categories?range=custom&start=2026-01-01&end=2026-04-30&vehicle=analysis-details']}><App /></MemoryRouter>)
+  expect(await screen.findByRole('heading', { name: '费用类别构成' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: '洗车，¥20.00，1笔，50%' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: '停车，¥10.00，1笔，25%' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: '保养，¥10.00，1笔，25%' })).toBeInTheDocument()
 })
 
-it('shows analysis previews and expands complete trend, month and category details on demand', async () => {
-  await db.saveVehicle({ id: 'analysis-expand', name: '按需展开车', energyType: 'fuel', initialMileage: 0, isDefault: true })
-  await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-expand', defaultVehicleId: 'analysis-expand' })
-  const base = { vehicleId: 'analysis-expand', excludedFromEnergy: false, createdAt: '', updatedAt: '' }
-  const records = [
-    ['parking', '2026-01-10T10:00', 1000], ['wash', '2026-02-10T10:00', 2000], ['toll', '2026-03-10T10:00', 3000],
-    ['maintenance', '2026-04-10T10:00', 4000], ['insurance', '2026-05-10T10:00', 5000], ['fine', '2026-06-10T10:00', 6000],
-  ] as const
-  for (const [category, occurredAt, amountCents] of records) await db.saveRecord({ ...base, id: `expand-${category}`, category, occurredAt, amountCents })
-
-  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-06-30']}><App /></MemoryRouter>)
-
-  const trendPanel = (await screen.findByRole('heading', { name: '费用趋势' })).closest('.panel') as HTMLElement
-  const monthsPanel = screen.getByRole('heading', { name: '月份费用对比' }).closest('.panel') as HTMLElement
-  const categoriesPanel = screen.getByRole('heading', { name: '费用类别构成' }).closest('.panel') as HTMLElement
-  expect(within(trendPanel).queryByRole('link', { name: /2026-01/ })).not.toBeInTheDocument()
-  expect(within(monthsPanel).getAllByRole('link')).toHaveLength(3)
-  expect(within(categoriesPanel).getAllByRole('link')).toHaveLength(3)
-  expect(within(categoriesPanel).getByText(/其他类别/)).toHaveTextContent('3 类')
-
-  fireEvent.click(within(trendPanel).getByRole('button', { name: '查看完整趋势' }))
-  fireEvent.click(within(monthsPanel).getByRole('button', { name: '查看全部月份' }))
-  fireEvent.click(within(categoriesPanel).getByRole('button', { name: '查看全部类别' }))
-  expect(within(trendPanel).getByRole('link', { name: /2026-01/ })).toBeInTheDocument()
-  expect(within(monthsPanel).getAllByRole('link')).toHaveLength(6)
-  expect(within(categoriesPanel).getAllByRole('link')).toHaveLength(6)
-  expect(within(categoriesPanel).queryByText('其他类别')).not.toBeInTheDocument()
-  expect(within(trendPanel).getByRole('button', { name: '收起完整趋势' })).toHaveAttribute('aria-expanded', 'true')
-})
 it('shows category and all-vehicle amounts, counts, shares and drill-down links', async () => {
   await db.saveVehicle({ id: 'analysis-car-a', name: '分析车 A', energyType: 'fuel', initialMileage: 0, isDefault: true })
   await db.saveVehicle({ id: 'analysis-car-b', name: '分析车 B', energyType: 'electric', initialMileage: 0 })
@@ -173,13 +164,14 @@ it('shows category and all-vehicle amounts, counts, shares and drill-down links'
   await db.saveRecord({ ...base, id: 'breakdown-b', vehicleId: 'analysis-car-a', category: 'wash', amountCents: 1000 })
   await db.saveRecord({ ...base, id: 'breakdown-c', vehicleId: 'analysis-car-b', category: 'parking', amountCents: 1000 })
 
-  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-31']}><App /></MemoryRouter>)
+  const categoriesPage = render(<MemoryRouter initialEntries={['/analysis/categories?range=custom&start=2026-01-01&end=2026-01-31&vehicle=all']}><App /></MemoryRouter>)
 
-  const categoryPanel = (await screen.findByRole('heading', { name: '费用类别构成' })).closest('.panel') as HTMLElement
-  expect(within(categoryPanel).queryByRole('button', { name: '查看全部类别' })).not.toBeInTheDocument()
   const categoryLink = await screen.findByRole('link', { name: '停车，¥30.00，2笔，75%' })
   expect(categoryLink).toHaveAttribute('href', expect.stringContaining('category=parking'))
-  const vehicleLink = screen.getByRole('link', { name: '分析车 A，¥30.00，2笔，75%' })
+  categoriesPage.unmount()
+
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-31&vehicle=all']}><App /></MemoryRouter>)
+  const vehicleLink = await screen.findByRole('link', { name: '分析车 A，¥30.00，2笔，75%' })
   expect(vehicleLink).toHaveAttribute('href', expect.stringContaining('vehicle=analysis-car-a'))
   expect(screen.getByRole('link', { name: '无费用车，¥0.00，0笔，0%' })).toBeInTheDocument()
 })

@@ -330,7 +330,19 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .calendar-page .calendar-summary .metric strong { margin-top: 7px; font-size: clamp(16px, 4.8vw, 20px); letter-spacing: -.04em; }
 }
 
-/* Analysis V1.12: details are available on demand without competing with primary actions. */
-.analysis-page .analysis-expand { min-height: 42px; margin-top: 12px; border-color: #add8d4; color: var(--ui-teal-strong); background: #effaf9; font-weight: 750; }
-.analysis-page .analysis-other-category { color: var(--ui-muted); }
-.analysis-page .analysis-other-category strong { color: var(--ui-text); }
+/* Analysis V1.13: summary cards open complete, independently addressable detail pages. */
+.analysis-entry-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.analysis-entry-card { display: flex; align-items: center; gap: 14px; min-height: 108px; padding: 18px; border: 1px solid var(--ui-line); border-radius: 18px; color: var(--ui-text); background: #fff; box-shadow: var(--ui-shadow); text-decoration: none; transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.analysis-entry-card:hover, .analysis-entry-card:focus-visible { border-color: #8ccbc5; box-shadow: 0 12px 30px rgba(20, 84, 77, .13); outline: none; transform: translateY(-1px); }
+.analysis-entry-card:active { transform: translateY(0); }
+.analysis-entry-icon { display: grid; flex: 0 0 50px; width: 50px; height: 50px; place-items: center; border-radius: 16px; color: var(--ui-teal-strong); background: #e6f7f5; }
+.analysis-entry-copy { display: grid; min-width: 0; gap: 7px; }
+.analysis-entry-copy strong { font-size: 18px; }
+.analysis-entry-copy span { overflow: hidden; color: var(--ui-muted); font-size: 14px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.analysis-entry-chevron { flex: 0 0 auto; margin-left: auto; color: #91a5aa; }
+.analysis-detail-page { max-width: 920px; }
+.analysis-detail-heading { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+.analysis-detail-heading h2 { margin: 4px 0 0; }
+.analysis-detail-heading p { margin: 7px 0 0; }
+.analysis-records-link { display: inline-flex; align-items: center; min-height: 44px; margin-top: 18px; color: var(--ui-teal-strong); font-weight: 750; }
+@media (max-width: 767px) { .analysis-entry-grid { grid-template-columns: 1fr; gap: 12px; } .analysis-entry-card { min-height: 96px; padding: 16px; } .analysis-entry-copy span { white-space: normal; } .analysis-detail-heading { margin-bottom: 16px; } }
