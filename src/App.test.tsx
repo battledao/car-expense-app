@@ -117,6 +117,7 @@ it('uses three analysis entry cards instead of rendering complete detail modules
   expect(screen.getByRole('link', { name: /费用类别构成/ })).toBeInTheDocument()
   expect(screen.queryByRole('img', { name: '费用趋势图' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /查看完整趋势|查看全部月份|查看全部类别/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: '查看详细记录' })).not.toBeInTheDocument()
 })
 
 it('shows the complete continuous trend and drill-down links in its own child page', async () => {
@@ -142,10 +143,12 @@ it('renders complete month and category details only on their own child pages', 
   await db.saveRecord({ ...base, id: 'detail-feb', category: 'wash', amountCents: 2000, occurredAt: '2026-02-10T10:00' })
   await db.saveRecord({ ...base, id: 'detail-apr', category: 'maintenance', amountCents: 1000, occurredAt: '2026-04-10T10:00' })
 
-  render(<MemoryRouter initialEntries={['/analysis/months?range=custom&start=2026-01-01&end=2026-04-30&vehicle=analysis-details']}><App /></MemoryRouter>)
+  const monthsPage = render(<MemoryRouter initialEntries={['/analysis/months?range=custom&start=2026-01-01&end=2026-04-30&vehicle=analysis-details']}><App /></MemoryRouter>)
   expect(await screen.findByRole('heading', { name: '月份费用对比' })).toBeInTheDocument()
   expect(await screen.findByRole('link', { name: '2026-03，¥0.00，0笔，较上月-¥20.00 · -100.0%' })).toBeInTheDocument()
   expect(await screen.findByRole('link', { name: '2026-04，¥10.00，1笔，较上月暂无可比较数据' })).toBeInTheDocument()
+
+  monthsPage.unmount()
 
   render(<MemoryRouter initialEntries={['/analysis/categories?range=custom&start=2026-01-01&end=2026-04-30&vehicle=analysis-details']}><App /></MemoryRouter>)
   expect(await screen.findByRole('heading', { name: '费用类别构成' })).toBeInTheDocument()

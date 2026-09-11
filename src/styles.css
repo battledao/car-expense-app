@@ -344,5 +344,4 @@ body { background: var(--ui-bg); color: var(--ui-text); }
 .analysis-detail-heading { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
 .analysis-detail-heading h2 { margin: 4px 0 0; }
 .analysis-detail-heading p { margin: 7px 0 0; }
-.analysis-records-link { display: inline-flex; align-items: center; min-height: 44px; margin-top: 18px; color: var(--ui-teal-strong); font-weight: 750; }
 @media (max-width: 767px) { .analysis-entry-grid { grid-template-columns: 1fr; gap: 12px; } .analysis-entry-card { min-height: 96px; padding: 16px; } .analysis-entry-copy span { white-space: normal; } .analysis-detail-heading { margin-bottom: 16px; } }
