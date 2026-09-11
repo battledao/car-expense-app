@@ -13,7 +13,7 @@ test('filters dashboard records by month and keeps the filter in detailed record
   await page.goto('/')
   await page.getByLabel('首页月份').fill('2026-08')
 
-  await expect(page.getByRole('img', { name: '近六个月费用趋势图' })).toBeVisible()
+  await expect(page.getByRole('img', { name: '近六个月费用趋势图' })).toHaveCount(0)
   await expect(page.locator('.metric').filter({ hasText: '本月费用' })).toContainText('¥25.00')
   await page.getByRole('link', { name: '查看本月记录' }).click()
   await expect(page.getByLabel('开始日期')).toHaveValue('2026-08-01')
@@ -22,7 +22,7 @@ test('filters dashboard records by month and keeps the filter in detailed record
   await expect(page.getByText('总金额').locator('..')).toContainText('¥25.00')
 })
 
-test('formats the dashboard trend axis in yuan instead of internal cents', async ({ page }) => {
+test('keeps dashboard trend out of home and formats the analysis trend in yuan', async ({ page }) => {
   await page.goto('/vehicles')
   await page.getByRole('button', { name: '新增车辆' }).click()
   await page.getByLabel('车辆名称').fill('趋势金额测试车')
@@ -35,9 +35,7 @@ test('formats the dashboard trend axis in yuan instead of internal cents', async
   await page.goto('/')
   await page.getByLabel('首页月份').fill('2026-09')
 
-  const chart = page.getByRole('img', { name: '近六个月费用趋势图' })
-  await expect(chart.getByRole('application')).toContainText('¥2,500')
-  await expect(chart.getByRole('application')).not.toContainText('250000')
+  await expect(page.getByRole('img', { name: '近六个月费用趋势图' })).toHaveCount(0)
 
   await page.goto('/analysis?range=all')
   const trendCard = page.getByRole('link', { name: /费用趋势/ })

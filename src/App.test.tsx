@@ -515,13 +515,13 @@ it('gives a clear empty detailed-record state with a path to create the first re
   expect(screen.getByRole('link', { name: '记一笔' })).toHaveAttribute('href', '/record')
 })
 
-it('shows a six-month dashboard trend and expands expense categories on demand', async () => {
+it('keeps dashboard trend details out of the home page and expands expense categories on demand', async () => {
   await db.saveVehicle({ id: 'v1', name: '趋势测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   for (const [index, category] of ['fuel', 'charge', 'parking', 'wash', 'maintenance', 'repair'].entries()) await db.saveRecord({ id: `record-${index}`, vehicleId: 'v1', category: category as ExpenseCategory, amountCents: (index + 1) * 1000, occurredAt: `2026-08-${String(index + 1).padStart(2, '0')}T10:00`, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
   render(<MemoryRouter><App /></MemoryRouter>)
 
   fireEvent.change(await screen.findByLabelText('首页月份'), { target: { value: '2026-08' } })
-  expect(screen.getByRole('img', { name: '近六个月费用趋势图' })).toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: '近六个月费用趋势图' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '显示全部类别' })).toBeInTheDocument()
   expect(screen.queryByRole('link', { name: '加油' })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '显示全部类别' }))
