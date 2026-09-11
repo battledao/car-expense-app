@@ -16,10 +16,12 @@ test('filters dashboard records by month and keeps the filter in detailed record
   await expect(page.getByRole('img', { name: '近六个月费用趋势图' })).toHaveCount(0)
   await expect(page.locator('.metric').filter({ hasText: '本月费用' })).toContainText('¥25.00')
   await page.getByRole('link', { name: '查看本月记录' }).click()
-  await expect(page.getByLabel('开始日期')).toHaveValue('2026-08-01')
-  await expect(page.getByLabel('结束日期')).toHaveValue('2026-08-31')
-  await expect(page.getByText('记录数量').locator('..')).toContainText('1 笔')
-  await expect(page.getByText('总金额').locator('..')).toContainText('¥25.00')
+  await page.getByRole('button', { name: /^筛选(?:，已生效 \d+ 项)?$/ }).click()
+  const filters = page.getByRole('dialog', { name: '筛选与排序' })
+  await expect(filters.getByLabel('开始日期')).toHaveValue('2026-08-01')
+  await expect(filters.getByLabel('结束日期')).toHaveValue('2026-08-31')
+  await filters.getByRole('button', { name: '关闭' }).click()
+  await expect(page.getByLabel('记录结果概览')).toContainText('1 笔 · ¥25.00')
 })
 
 test('keeps dashboard trend out of home and formats the analysis trend in yuan', async ({ page }) => {

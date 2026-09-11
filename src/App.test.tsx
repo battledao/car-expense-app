@@ -152,7 +152,7 @@ it('renders complete month and category details only on their own child pages', 
 
   render(<MemoryRouter initialEntries={['/analysis/categories?range=custom&start=2026-01-01&end=2026-04-30&vehicle=analysis-details']}><App /></MemoryRouter>)
   expect(await screen.findByRole('heading', { name: '费用类别构成' })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: '洗车，¥20.00，1笔，50%' })).toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: '洗车，¥20.00，1笔，50%' })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: '停车，¥10.00，1笔，25%' })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: '保养，¥10.00，1笔，25%' })).toBeInTheDocument()
 })
@@ -336,11 +336,13 @@ it('applies dashboard record URL filters when opening detailed records', async (
   await db.saveRecord({ id: 'out', vehicleId: 'v1', category: 'wash', amountCents: 3300, occurredAt: '2026-09-02T10:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
   render(<MemoryRouter initialEntries={['/records?vehicle=v1&start=2026-08-01&end=2026-08-31&category=parking']}><App /></MemoryRouter>)
 
-  await waitFor(() => expect(screen.getByText('记录数量').closest('.metric')).toHaveTextContent('1 笔'))
-  expect(screen.getByText('总金额').closest('.metric')).toHaveTextContent('¥12.00')
-  expect(screen.getByLabelText('类别筛选')).toHaveValue('parking')
-  expect(screen.getByLabelText('开始日期')).toHaveValue('2026-08-01')
-  expect(screen.getByLabelText('结束日期')).toHaveValue('2026-08-31')
+  const overview = screen.getByLabelText('记录结果概览')
+  await waitFor(() => expect(overview).toHaveTextContent('1 笔 · ¥12.00'))
+  fireEvent.click(screen.getByRole('button', { name: /^筛选/ }))
+  const drawer = await screen.findByRole('dialog', { name: '筛选与排序' })
+  expect(within(drawer).getByLabelText('类别筛选')).toHaveValue('parking')
+  expect(within(drawer).getByLabelText('开始日期')).toHaveValue('2026-08-01')
+  expect(within(drawer).getByLabelText('结束日期')).toHaveValue('2026-08-31')
 })
 
 it('keeps detailed-record filters in the URL model, searches category names and validates ranges', async () => {
@@ -353,15 +355,18 @@ it('keeps detailed-record filters in the URL model, searches category names and 
 
   render(<MemoryRouter initialEntries={['/records?vehicle=records-a&query=%E5%81%9C%E8%BD%A6&category=parking&start=2026-08-01&end=2026-08-31&min=10&max=20&sort=amount-desc']}><App /></MemoryRouter>)
 
-  await waitFor(() => expect(screen.getByLabelText('详细记录车辆')).toHaveValue('records-a'))
-  expect(screen.getByLabelText('搜索记录')).toHaveValue('停车')
-  expect(screen.getByLabelText('类别筛选')).toHaveValue('parking')
-  expect(screen.getByLabelText('开始日期')).toHaveValue('2026-08-01')
-  expect(screen.getByLabelText('结束日期')).toHaveValue('2026-08-31')
-  expect(screen.getByLabelText('最低金额')).toHaveValue(10)
-  expect(screen.getByLabelText('最高金额')).toHaveValue(20)
-  expect(screen.getByLabelText('排序')).toHaveValue('amount-desc')
-  expect(screen.getByText('记录数量').closest('.metric')).toHaveTextContent('1 笔')
+  expect(await screen.findByLabelText('搜索记录')).toHaveValue('停车')
+  await waitFor(() => expect(screen.getByLabelText('记录结果概览')).toHaveTextContent('1 笔 · ¥12.00'))
+  fireEvent.click(screen.getByRole('button', { name: /^筛选/ }))
+  const drawer = await screen.findByRole('dialog', { name: '筛选与排序' })
+  expect(within(drawer).getByLabelText('详细记录车辆')).toHaveValue('records-a')
+  expect(within(drawer).getByLabelText('类别筛选')).toHaveValue('parking')
+  expect(within(drawer).getByLabelText('开始日期')).toHaveValue('2026-08-01')
+  expect(within(drawer).getByLabelText('结束日期')).toHaveValue('2026-08-31')
+  expect(within(drawer).getByLabelText('最低金额')).toHaveValue(10)
+  expect(within(drawer).getByLabelText('最高金额')).toHaveValue(20)
+  expect(within(drawer).getByLabelText('排序')).toHaveValue('amount-desc')
+  expect(screen.getByLabelText('记录结果概览')).toHaveTextContent('1 笔 · ¥12.00')
   expect(screen.getByRole('button', { name: '移除关键词筛选' })).toBeInTheDocument()
 
   fireEvent.click(screen.getByRole('button', { name: '移除关键词筛选' }))
@@ -373,7 +378,79 @@ it('keeps detailed-record filters in the URL model, searches category names and 
   expect(screen.getByRole('alert')).toHaveTextContent('最低金额不能高于最高金额。')
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
 })
-it('summarizes all matching records, sorts ties stably and loads records in pages', async () => {
+it('validates drawer conditions and restores the filter trigger focus after closing', async () => {
+  await db.saveVehicle({ id: 'drawer-car', name: '抽屉测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveRecord({ id: 'drawer-record', vehicleId: 'drawer-car', category: 'parking', amountCents: 1200, occurredAt: '2026-08-08T09:30', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter initialEntries={['/records?vehicle=drawer-car']}><App /></MemoryRouter>)
+
+  await screen.findByRole('table', { name: '详细记录列表' })
+  const trigger = screen.getByRole('button', { name: /^筛选/ })
+  fireEvent.click(trigger)
+  const drawer = await screen.findByRole('dialog', { name: '筛选与排序' })
+  fireEvent.change(within(drawer).getByLabelText('开始日期'), { target: { value: '2026-08-31' } })
+  fireEvent.change(within(drawer).getByLabelText('结束日期'), { target: { value: '2026-08-01' } })
+  expect(within(drawer).getByRole('alert')).toHaveTextContent('开始日期不能晚于结束日期。')
+  expect(within(drawer).getByRole('button', { name: '查看 0 条记录' })).toBeDisabled()
+
+  fireEvent.click(within(drawer).getByRole('button', { name: '关闭' }))
+  await waitFor(() => expect(trigger).toHaveFocus())
+
+  fireEvent.click(trigger)
+  const reopenedDrawer = await screen.findByRole('dialog', { name: '筛选与排序' })
+  const apply = within(reopenedDrawer).getByRole('button', { name: '查看 1 条记录' })
+  apply.focus()
+  fireEvent.keyDown(window, { key: 'Tab' })
+  expect(within(reopenedDrawer).getByRole('button', { name: '关闭' })).toHaveFocus()
+  fireEvent.keyDown(window, { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '筛选与排序' })).not.toBeInTheDocument())
+  expect(trigger).toHaveFocus()
+})
+it('applies drawer filters only after confirmation and clears them without changing the selected vehicle', async () => {
+  await db.saveVehicle({ id: 'draft-car', name: '草稿测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  const base = { vehicleId: 'draft-car', excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'draft-parking', category: 'parking', amountCents: 1200, occurredAt: '2026-08-08T09:30' })
+  await db.saveRecord({ ...base, id: 'draft-wash', category: 'wash', amountCents: 3000, occurredAt: '2026-08-09T09:30' })
+  render(<MemoryRouter initialEntries={['/records?vehicle=draft-car']}><App /></MemoryRouter>)
+
+  const overview = screen.getByLabelText('记录结果概览')
+  await waitFor(() => expect(overview).toHaveTextContent('2 笔 · ¥42.00'))
+  fireEvent.click(screen.getByRole('button', { name: /^筛选/ }))
+  const drawer = await screen.findByRole('dialog', { name: '筛选与排序' })
+  fireEvent.change(within(drawer).getByLabelText('类别筛选'), { target: { value: 'parking' } })
+  expect(overview).toHaveTextContent('2 笔 · ¥42.00')
+  fireEvent.click(within(drawer).getByRole('button', { name: '查看 1 条记录' }))
+  await waitFor(() => expect(overview).toHaveTextContent('1 笔 · ¥12.00'))
+  expect(screen.getByRole('button', { name: '移除类别筛选' })).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: /^筛选/ }))
+  const reopened = await screen.findByRole('dialog', { name: '筛选与排序' })
+  fireEvent.change(within(reopened).getByLabelText('详细记录车辆'), { target: { value: 'all' } })
+  fireEvent.click(within(reopened).getByRole('button', { name: '清除筛选' }))
+  await waitFor(() => expect(overview).toHaveTextContent('2 笔 · ¥42.00'))
+  expect(within(reopened).getByLabelText('详细记录车辆')).toHaveValue('draft-car')
+  expect(within(reopened).getByLabelText('类别筛选')).toHaveValue('')
+})
+it('guides users through distinct detailed-record empty states and recovery actions', async () => {
+  render(<MemoryRouter initialEntries={['/records']}><App /></MemoryRouter>)
+  expect(await screen.findByText('还没有车辆，请先新增车辆后再记录费用。')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: '新增车辆' })).toHaveAttribute('href', '/vehicles')
+
+  cleanup()
+  await db.saveVehicle({ id: 'empty-car', name: '空状态测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  render(<MemoryRouter initialEntries={['/records?vehicle=empty-car']}><App /></MemoryRouter>)
+  expect(await screen.findByText('还没有费用记录，先记录第一笔费用吧。')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: '记录第一笔费用' })).toHaveAttribute('href', '/record?vehicle=empty-car')
+
+  cleanup()
+  await db.saveRecord({ id: 'empty-filter-record', vehicleId: 'empty-car', category: 'parking', amountCents: 1200, occurredAt: '2026-08-08T09:30', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter initialEntries={['/records?vehicle=empty-car&category=wash']}><App /></MemoryRouter>)
+  expect(await screen.findByText('当前筛选条件下没有符合条件的记录。')).toBeInTheDocument()
+  expect(screen.getByText('当前条件：车辆：空状态测试车 · 类别：洗车')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: '记一笔' })).toHaveAttribute('href', '/record?vehicle=empty-car')
+  fireEvent.click(screen.getByRole('button', { name: '清除筛选' }))
+  await waitFor(() => expect(screen.getByLabelText('记录结果概览')).toHaveTextContent('1 笔 · ¥12.00'))
+})
+it('summarizes all matching records, defaults to latest and loads records in pages', async () => {
   await db.saveVehicle({ id: 'records-many', name: '大量记录车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   const base = { vehicleId: 'records-many', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
   await db.saveRecord({ ...base, id: 'a-stable', amountCents: 10, occurredAt: '2026-08-01T08:00' })
@@ -382,24 +459,37 @@ it('summarizes all matching records, sorts ties stably and loads records in page
 
   render(<MemoryRouter initialEntries={['/records?vehicle=records-many']}><App /></MemoryRouter>)
 
-  await waitFor(() => expect(screen.getByText('记录数量').closest('.metric')).toHaveTextContent('65 笔'))
-  expect(screen.getByText('总金额').closest('.metric')).toHaveTextContent('¥21.72')
-  expect(screen.getByText('平均单笔金额').closest('.metric')).toHaveTextContent('¥0.33')
-  expect(screen.getByText('记录日期').closest('.metric')).toHaveTextContent('2026年8月1日')
+  const overview = screen.getByLabelText('记录结果概览')
+  await waitFor(() => expect(overview).toHaveTextContent('65 笔 · ¥21.72'))
+  expect(overview).toHaveTextContent('2026年8月1日')
   const table = screen.getByRole('table', { name: '详细记录列表' })
-  expect(within(table).getAllByRole('row')).toHaveLength(31)
-  expect(within(table).getAllByRole('row')[1]).toHaveAttribute('data-record-id', 'a-stable')
-  expect(screen.getByText('已展示 30 / 共 65 条')).toBeInTheDocument()
+  expect(within(table).getAllByRole('row')).toHaveLength(11)
+  expect(within(table).getAllByRole('row')[1]).toHaveAttribute('data-record-id', 'record-28')
+  expect(screen.getByText('已显示 10 / 共 65 条')).toBeInTheDocument()
 
   fireEvent.click(screen.getByRole('button', { name: '加载更多记录' }))
-  await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(61))
+  await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(21))
   fireEvent.click(screen.getByRole('button', { name: '加载更多记录' }))
-  await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(66))
-  expect(screen.queryByRole('button', { name: '加载更多记录' })).not.toBeInTheDocument()
+  await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(31))
 
-  fireEvent.change(screen.getByLabelText('排序'), { target: { value: 'amount-desc' } })
-  expect(screen.getByText('已展示 30 / 共 65 条')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /^筛选/ }))
+  const drawer = await screen.findByRole('dialog', { name: '筛选与排序' })
+  fireEvent.change(within(drawer).getByLabelText('排序'), { target: { value: 'amount-desc' } })
+  fireEvent.click(within(drawer).getByRole('button', { name: '查看 65 条记录' }))
+  expect(screen.getByText('已显示 10 / 共 65 条')).toBeInTheDocument()
   expect(within(table).getAllByRole('row')[1]).toHaveAttribute('data-record-id', 'record-65')
+
+  fireEvent.click(screen.getByRole('button', { name: /^筛选/ }))
+  const lowAmountDrawer = await screen.findByRole('dialog', { name: '筛选与排序' })
+  fireEvent.change(within(lowAmountDrawer).getByLabelText('排序'), { target: { value: 'amount-asc' } })
+  fireEvent.click(within(lowAmountDrawer).getByRole('button', { name: '查看 65 条记录' }))
+  expect(within(table).getAllByRole('row')[1]).toHaveAttribute('data-record-id', 'record-03')
+
+  fireEvent.click(screen.getByRole('button', { name: /^筛选/ }))
+  const earliestDrawer = await screen.findByRole('dialog', { name: '筛选与排序' })
+  fireEvent.change(within(earliestDrawer).getByLabelText('排序'), { target: { value: 'date-asc' } })
+  fireEvent.click(within(earliestDrawer).getByRole('button', { name: '查看 65 条记录' }))
+  expect(within(table).getAllByRole('row')[1]).toHaveAttribute('data-record-id', 'a-stable')
 })
 
 it('opens complete detailed-record information and restores focus after closing', async () => {
@@ -445,7 +535,7 @@ it('edits from detail and handles detailed-record deletion failure without losin
   fireEvent.change(within(edit).getByLabelText('金额（元）'), { target: { value: '15' } })
   fireEvent.click(within(edit).getByRole('button', { name: '保存更改' }))
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('记录已更新。'))
-  expect(screen.getByLabelText('排序')).toHaveValue('amount-desc')
+  expect(screen.getByRole('button', { name: '当前排序：金额从高到低' })).toBeInTheDocument()
   expect(table.querySelectorAll('tbody tr')[0]).toHaveAttribute('data-record-id', 'manage-other')
 
   fireEvent.click(within(targetRow).getByRole('button', { name: '查看2026年8月8日停车记录' }))
@@ -457,7 +547,7 @@ it('edits from detail and handles detailed-record deletion failure without losin
   remove.mockRestore()
   fireEvent.click(within(screen.getByRole('dialog', { name: '记录详情' })).getByRole('button', { name: '删除记录' }))
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '记录详情' })).not.toBeInTheDocument())
-  await waitFor(() => expect(screen.getByText('记录数量').closest('.metric')).toHaveTextContent('1 笔'))
+  await waitFor(() => expect(screen.getByLabelText('记录结果概览')).toHaveTextContent('1 笔 · ¥20.00'))
   expect(confirm).toHaveBeenCalledTimes(2)
 })
 
@@ -493,11 +583,11 @@ it('copies a record through a prefilled form and creates a new independent recor
   expect(created.excludedFromEnergy).toBe(true)
 })
 
-it('reveals and temporarily highlights a newly created record beyond the first result page', async () => {
+it('reveals and temporarily highlights a requested record beyond the first result page', async () => {
   await db.saveVehicle({ id: 'highlight-car', name: '高亮测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   const base = { vehicleId: 'highlight-car', category: 'parking' as const, amountCents: 1000, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
   for (let index = 1; index <= 30; index += 1) await db.saveRecord({ ...base, id: `highlight-${index}`, occurredAt: `2026-08-${String(index).padStart(2, '0')}T08:00` })
-  await db.saveRecord({ ...base, id: 'highlight-target', amountCents: 2500, occurredAt: '2026-09-01T08:00' })
+  await db.saveRecord({ ...base, id: 'highlight-target', amountCents: 2500, occurredAt: '2026-07-01T08:00' })
 
   render(<MemoryRouter initialEntries={['/records?vehicle=highlight-car&highlight=highlight-target']}><App /></MemoryRouter>)
   const table = await screen.findByRole('table', { name: '详细记录列表' })
@@ -505,14 +595,16 @@ it('reveals and temporarily highlights a newly created record beyond the first r
   await waitFor(() => expect(table.querySelector('[data-record-id="highlight-target"]')).not.toBeNull())
   const target = table.querySelector('[data-record-id="highlight-target"]')
   expect(target).not.toBeNull()
-  expect(screen.getByText('已展示 31 / 共 31 条')).toBeInTheDocument()
+  expect(target).toHaveClass('record-highlighted')
+  expect(screen.getByLabelText('详细记录卡片列表').querySelector('[data-record-id="highlight-target"]')).toHaveClass('record-highlighted')
+  expect(screen.getByText('已显示 31 / 共 31 条')).toBeInTheDocument()
   expect(target).toHaveTextContent('¥25.00')
 })
 
-it('gives a clear empty detailed-record state with a path to create the first record', () => {
+it('保留详细记录无车辆时的新增车辆入口', async () => {
   render(<MemoryRouter initialEntries={['/records']}><App /></MemoryRouter>)
-  expect(screen.getByText('没有符合条件的记录。')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: '记一笔' })).toHaveAttribute('href', '/record')
+  expect(await screen.findByText('还没有车辆，请先新增车辆后再记录费用。')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: '新增车辆' })).toHaveAttribute('href', '/vehicles')
 })
 
 it('keeps dashboard trend details out of the home page and expands expense categories on demand', async () => {

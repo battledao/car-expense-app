@@ -13,11 +13,12 @@ test('can navigate all primary modules and create a vehicle', async ({ page }) =
   await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
   await page.getByLabel('金额（元）').fill('20')
   await page.getByRole('button', { name: '保存并查看记录' }).click()
-  await expect(page.getByText('记录数量').locator('..')).toContainText('1 笔')
-  await expect(page.getByText('总金额').locator('..')).toContainText('¥20.00')
+  const overview = page.getByLabel('记录结果概览')
+  await expect(overview).toContainText('1 笔')
+  await expect(overview).toContainText('¥20.00')
 })
 
-test('sorts detailed records by date ascending by default and can switch to descending', async ({ page }) => {
+test('sorts detailed records by latest by default and can switch filters to earliest', async ({ page }) => {
   await page.goto('/vehicles')
   await page.getByRole('button', { name: '新增车辆' }).click()
   await page.getByLabel('车辆名称').fill('排序测试车')
@@ -34,17 +35,26 @@ test('sorts detailed records by date ascending by default and can switch to desc
   await page.getByLabel('发生时间').fill('2026-01-01T12:00')
   await page.getByRole('button', { name: '保存并查看记录' }).click()
 
-  await expect(page.locator('tbody tr').first()).toContainText('2026年1月1日')
-  await page.getByLabel('排序').selectOption('date-desc')
-  await expect(page.locator('tbody tr').first()).toContainText('2026年1月2日')
+  const rows = page.locator('tbody tr')
+  await expect(rows.first()).toContainText('2026年1月2日')
 
-  await page.getByLabel('最低金额').fill('15')
-  await expect(page.locator('tbody tr')).toHaveCount(1)
-  await page.getByRole('button', { name: '清除全部' }).click()
-  await expect(page.getByLabel('最低金额')).toHaveValue('')
-  await expect(page.getByLabel('排序')).toHaveValue('date-asc')
-  await expect(page.locator('tbody tr')).toHaveCount(2)
-  await expect(page.locator('tbody tr').first()).toContainText('2026年1月1日')
+  await page.getByRole('button', { name: /^筛选/ }).click()
+  const filters = page.getByRole('dialog', { name: '筛选与排序' })
+  await filters.getByLabel('排序').selectOption('date-asc')
+  await filters.getByRole('button', { name: '查看 2 条记录' }).click()
+  await expect(rows.first()).toContainText('2026年1月1日')
+
+  await page.getByRole('button', { name: /^筛选/ }).click()
+  await filters.getByLabel('最低金额').fill('15')
+  await filters.getByRole('button', { name: '查看 1 条记录' }).click()
+  await expect(rows).toHaveCount(1)
+
+  await page.getByRole('button', { name: /^筛选/ }).click()
+  await filters.getByRole('button', { name: '清除筛选' }).click()
+  await expect(filters.getByLabel('最低金额')).toHaveValue('')
+  await expect(filters.getByLabel('排序')).toHaveValue('date-desc')
+  await expect(rows).toHaveCount(2)
+  await expect(rows.first()).toContainText('2026年1月2日')
 })
 
 test('saves and restores a selected fuel grade', async ({ page }) => {
@@ -61,8 +71,11 @@ test('saves and restores a selected fuel grade', async ({ page }) => {
   await page.getByLabel('油品标号').selectOption('95号')
   await expect(page.getByLabel('油品标号')).toHaveValue('95号')
   await page.getByRole('button', { name: '保存并查看记录' }).click()
-  await page.getByRole('button', { name: '编辑' }).click()
-  await expect(page.getByLabel('油品标号')).toHaveValue('95号')
+  await page.getByRole('button', { name: /查看.*加油.*记录/ }).click()
+  const detail = page.getByRole('dialog', { name: '记录详情' })
+  await expect(detail).toContainText('油品标号：95号')
+  await detail.getByRole('button', { name: '编辑记录' }).click()
+  await expect(page.getByRole('dialog', { name: '编辑记录' }).getByLabel('油品标号')).toHaveValue('95号')
 })
 
 test('adapts energy scenes by vehicle type and supports keyboard scene selection', async ({ page }) => {
