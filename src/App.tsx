@@ -46,6 +46,13 @@ const recordSorts: RecordSort[] = ['date-asc', 'date-desc', 'amount-asc', 'amoun
 const recordSortLabels: Record<RecordSort, string> = { 'date-asc': '最早优先', 'date-desc': '最新优先', 'amount-asc': '金额从低到高', 'amount-desc': '金额从高到低' }
 const validDate = (value?: string | null) => !value || /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value)
 const amountParam = (value: string | null) => value === null || value === '' ? undefined : Number.isFinite(Number(value)) && Number(value) >= 0 ? Math.round(Number(value) * 100) : undefined
+const recordMatchesQuery = (record: ExpenseRecord, query: string | undefined, vehicles: Vehicle[]) => {
+  const normalized = query?.trim().toLocaleLowerCase()
+  if (!normalized) return true
+  const vehicleName = vehicles.find(vehicle => vehicle.id === record.vehicleId)?.name ?? ''
+  return [categoryLabels[record.category], vehicleName, record.merchantOrLocation, record.notes].filter(Boolean).join(' ').toLocaleLowerCase().includes(normalized)
+}
+type RecordFilterDraft = { vehicleId: string; category: string; start: string; end: string; min: string; max: string; sort: RecordSort }
 function RecordForm({ data, record, copyFrom, preset, presetDate, presetVehicle, returnTo, done }: { data: Data; record?: ExpenseRecord; copyFrom?: ExpenseRecord; preset?: ExpenseCategory | null; presetDate?: string; presetVehicle?: string; returnTo?: string; done?: (saved: ExpenseRecord) => void }) {
   const source = record ?? copyFrom
   const go = useNavigate(), initialVehicle = source?.vehicleId ?? presetVehicle ?? (data.selected === ALL ? data.vehicles.find(v => v.isDefault)?.id ?? '' : data.selected), [vehicleId, setVehicle] = useState(initialVehicle), [category, setCategory] = useState<ExpenseCategory>(source?.category ?? preset ?? 'parking'), [amount, setAmount] = useState(source ? String(source.amountCents / 100) : ''), [date, setDate] = useState(record?.occurredAt.slice(0,16) ?? (presetDate ? `${presetDate}T${localNow().slice(11, 16)}` : localNow())), [mileage, setMileage] = useState(source?.mileage?.toString() ?? ''), [place, setPlace] = useState(source?.merchantOrLocation ?? ''), [notes, setNotes] = useState(source?.notes ?? ''), [qty, setQty] = useState(String(source?.fuelLiters ?? source?.chargeKwh ?? '')), [price, setPrice] = useState(source?.unitPriceCents === undefined ? '' : String(source.unitPriceCents / 100)), [full, setFull] = useState(Boolean(source?.isFullFuel ?? source?.isFullCharge)), [extra, setExtra] = useState(source?.fuelGrade ?? source?.chargeMethod ?? ''), [errors, setErrors] = useState<Record<string, string>>({}), [status, setStatus] = useState(''), [saving, setSaving] = useState(false)
@@ -65,18 +72,21 @@ function Records({ data }: { data: Data }) {
   const [viewing, setViewing] = useState<ExpenseRecord>()
   const [editing, setEditing] = useState<ExpenseRecord>()
   const [copying, setCopying] = useState<ExpenseRecord>()
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [status, setStatus] = useState('')
-  const [visibleCount, setVisibleCount] = useState(30)
+  const [visibleCount, setVisibleCount] = useState(10)
   const initialVehicleRef = useRef<string | undefined>(undefined)
   const pendingVehicleRef = useRef<string | undefined>(undefined)
   const detailRef = useRef<HTMLHeadingElement | null>(null)
-  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const triggerRef = useRef<HTMLElement | null>(null)
+  const filterTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const drawerRef = useRef<HTMLDivElement | null>(null)
   const rawVehicle = params.get('vehicle')
   const validVehicle = data.vehicles.some(vehicle => vehicle.id === rawVehicle) ? rawVehicle! : undefined
   const rawCategory = params.get('category')
   const category = categories.includes(rawCategory as ExpenseCategory) ? rawCategory as ExpenseCategory : undefined
   const rawSort = params.get('sort')
-  const sort = recordSorts.includes(rawSort as RecordSort) ? rawSort as RecordSort : 'date-asc'
+  const sort = recordSorts.includes(rawSort as RecordSort) ? rawSort as RecordSort : 'date-desc'
   const highlightedId = params.get('highlight') || undefined
   const query = params.get('query')?.trim() || undefined
   const start = params.get('start') || undefined
@@ -88,7 +98,7 @@ function Records({ data }: { data: Data }) {
   const errors = [
     rawVehicle && !validVehicle ? '已忽略不存在的车辆条件。' : undefined,
     rawCategory && !category ? '已忽略无效的费用类别。' : undefined,
-    rawSort && sort === 'date-asc' && rawSort !== 'date-asc' ? '已恢复默认排序。' : undefined,
+    rawSort && sort === 'date-desc' && rawSort !== 'date-desc' ? '已恢复默认排序。' : undefined,
     !validDate(start) || !validDate(end) ? '日期格式无效。' : undefined,
     min !== null && min !== '' && minCents === undefined ? '最低金额必须为有效非负数。' : undefined,
     max !== null && max !== '' && maxCents === undefined ? '最高金额必须为有效非负数。' : undefined,
@@ -96,8 +106,22 @@ function Records({ data }: { data: Data }) {
     minCents !== undefined && maxCents !== undefined && minCents > maxCents ? '最低金额不能高于最高金额。' : undefined,
   ].filter(Boolean) as string[]
   const hasRangeError = errors.some(error => error === '日期格式无效。' || error.includes('金额') || error.includes('开始日期'))
-  const vehicleId = validVehicle ?? (data.selected === ALL ? undefined : data.selected)
-  const filters: RecordFilters = { vehicleId, category, start: validDate(start) ? start : undefined, end: validDate(end) ? end : undefined, minCents, maxCents }
+  const activeVehicleId = validVehicle ?? (data.selected === ALL ? ALL : data.selected)
+  const vehicleId = activeVehicleId === ALL ? undefined : activeVehicleId
+  const filters = useMemo<RecordFilters>(() => ({ vehicleId, category, start: validDate(start) ? start : undefined, end: validDate(end) ? end : undefined, minCents, maxCents }), [vehicleId, category, start, end, minCents, maxCents])
+  const currentDraft: RecordFilterDraft = { vehicleId: activeVehicleId, category: category ?? '', start: start ?? '', end: end ?? '', min: min ?? '', max: max ?? '', sort }
+  const [draft, setDraft] = useState<RecordFilterDraft>(currentDraft)
+  const draftMinCents = amountParam(draft.min)
+  const draftMaxCents = amountParam(draft.max)
+  const draftErrors = [
+    !validDate(draft.start) || !validDate(draft.end) ? '日期格式无效。' : undefined,
+    draft.min !== '' && draftMinCents === undefined ? '最低金额必须为有效非负数。' : undefined,
+    draft.max !== '' && draftMaxCents === undefined ? '最高金额必须为有效非负数。' : undefined,
+    draft.start && draft.end && draft.start > draft.end ? '开始日期不能晚于结束日期。' : undefined,
+    draftMinCents !== undefined && draftMaxCents !== undefined && draftMinCents > draftMaxCents ? '最低金额不能高于最高金额。' : undefined,
+  ].filter(Boolean) as string[]
+  const draftFilters = useMemo<RecordFilters>(() => ({ vehicleId: draft.vehicleId === ALL ? undefined : draft.vehicleId, category: draft.category as ExpenseCategory || undefined, start: validDate(draft.start) ? draft.start || undefined : undefined, end: validDate(draft.end) ? draft.end || undefined : undefined, minCents: draftMinCents, maxCents: draftMaxCents }), [draft.vehicleId, draft.category, draft.start, draft.end, draftMinCents, draftMaxCents])
+  const previewCount = useMemo(() => draftErrors.length ? 0 : filterRecords(data.records, draftFilters).filter(record => recordMatchesQuery(record, query, data.vehicles)).length, [data.records, data.vehicles, draftErrors.length, draftFilters, query])
 
   useEffect(() => {
     if (!data.vehicles.length || initialVehicleRef.current !== undefined) return
@@ -118,55 +142,103 @@ function Records({ data }: { data: Data }) {
     setParams(next, { replace: true })
   }, [data.selected, params, setParams])
 
-  const update = (changes: Record<string, string | undefined>) => {
+  useEffect(() => {
+    if (!filtersOpen) setDraft(currentDraft)
+  }, [filtersOpen, activeVehicleId, category, start, end, min, max, sort])
+
+  const update = (changes: Record<string, string | undefined>, replace = false) => {
     const next = new URLSearchParams(params)
     for (const [key, value] of Object.entries(changes)) value ? next.set(key, value) : next.delete(key)
-    setParams(next, { replace: true })
+    setParams(next, { replace })
   }
   const chooseVehicle = (nextVehicle: string) => void data.select(nextVehicle)
-  const searchableRecords = useMemo(() => filterRecords(data.records, filters).filter(record => {
-    if (!query) return true
-    const vehicleName = data.vehicles.find(vehicle => vehicle.id === record.vehicleId)?.name ?? ''
-    return [categoryLabels[record.category], vehicleName, record.merchantOrLocation, record.notes].filter(Boolean).join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase())
-  }), [data.records, data.vehicles, filters, query])
+  const openFilters = (trigger: HTMLButtonElement) => { filterTriggerRef.current = trigger; setFiltersOpen(true) }
+  const closeFilters = () => { setFiltersOpen(false); window.setTimeout(() => filterTriggerRef.current?.isConnected && filterTriggerRef.current.focus()) }
+  const searchableRecords = useMemo(() => filterRecords(data.records, filters).filter(record => recordMatchesQuery(record, query, data.vehicles)), [data.records, data.vehicles, filters, query])
   const records = useMemo(() => [...searchableRecords].sort((left, right) => {
     const primary = sort === 'date-desc' ? right.occurredAt.localeCompare(left.occurredAt) : sort === 'date-asc' ? left.occurredAt.localeCompare(right.occurredAt) : sort === 'amount-desc' ? right.amountCents - left.amountCents : left.amountCents - right.amountCents
     return primary || left.occurredAt.localeCompare(right.occurredAt) || left.id.localeCompare(right.id)
   }), [searchableRecords, sort])
   const dateRange = records.length ? `${formatDate(records.reduce((first, record) => record.occurredAt < first.occurredAt ? record : first).occurredAt)} 至 ${formatDate(records.reduce((last, record) => record.occurredAt > last.occurredAt ? record : last).occurredAt)}` : '—'
   const visibleRecords = records.slice(0, visibleCount)
-  useEffect(() => setVisibleCount(30), [vehicleId, query, category, start, end, min, max, sort])
+  const activeFilterCount = [validVehicle, query, category, start, end, min, max, sort !== 'date-desc' ? sort : undefined].filter(Boolean).length
+  useEffect(() => setVisibleCount(10), [vehicleId, query, category, start, end, min, max, sort])
   useEffect(() => { const index = highlightedId ? records.findIndex(record => record.id === highlightedId) : -1; if (index >= visibleCount) setVisibleCount(index + 1) }, [highlightedId, records, visibleCount])
-  useEffect(() => { if (!highlightedId || !visibleRecords.some(record => record.id === highlightedId)) return; Array.from(document.querySelectorAll<HTMLElement>('[data-record-id]')).find(node => node.dataset.recordId === highlightedId)?.scrollIntoView?.({ block: 'center' }); const timer = window.setTimeout(() => { const next = new URLSearchParams(params); next.delete('highlight'); setParams(next, { replace: true }) }, 2000); return () => window.clearTimeout(timer) }, [highlightedId, params, setParams, visibleRecords])
+  useEffect(() => {
+    if (!highlightedId || !visibleRecords.some(record => record.id === highlightedId)) return
+    const matches = Array.from(document.querySelectorAll<HTMLElement>('[data-record-id]')).filter(node => node.dataset.recordId === highlightedId)
+    const target = matches.find(node => node.getClientRects().length > 0) ?? matches[0]
+    target?.scrollIntoView?.({ block: 'center' })
+    const timer = window.setTimeout(() => { const next = new URLSearchParams(params); next.delete('highlight'); setParams(next, { replace: true }) }, 2000)
+    return () => window.clearTimeout(timer)
+  }, [highlightedId, params, setParams, visibleRecords])
   useEffect(() => { if (viewing) window.setTimeout(() => detailRef.current?.focus()) }, [viewing])
-  const openViewing = (record: ExpenseRecord, trigger: HTMLButtonElement) => { triggerRef.current = trigger; setViewing(record) }
+  const openViewing = (record: ExpenseRecord, trigger: HTMLElement) => { triggerRef.current = trigger; setViewing(record) }
   const restoreFocus = () => window.setTimeout(() => triggerRef.current?.isConnected && triggerRef.current.focus())
   const closeViewing = () => { setViewing(undefined); restoreFocus() }
-  const openEditing = (record: ExpenseRecord, trigger: HTMLButtonElement) => { triggerRef.current = trigger; setEditing(record) }
+  const openEditing = (record: ExpenseRecord, trigger: HTMLElement) => { triggerRef.current = trigger; setEditing(record) }
   const closeEditing = () => { setEditing(undefined); restoreFocus() }
   const editViewing = () => { if (!viewing) return; setEditing(viewing); setViewing(undefined) }
-  const openCopying = (record: ExpenseRecord, trigger: HTMLButtonElement) => { triggerRef.current = trigger; setCopying(record) }
+  const openCopying = (record: ExpenseRecord, trigger: HTMLElement) => { triggerRef.current = trigger; setCopying(record) }
   const closeCopying = () => { setCopying(undefined); restoreFocus() }
   const copyViewing = () => { if (!viewing) return; setCopying(viewing); setViewing(undefined) }
   const removeRecord = async (record: ExpenseRecord) => { const vehicleName = data.vehicles.find(vehicle => vehicle.id === record.vehicleId)?.name ?? '已删除车辆'; if (!window.confirm(`确定删除 ${formatDate(record.occurredAt)} · ${vehicleName} · ${categoryLabels[record.category]} · ${formatMoney(record.amountCents)} 这条记录吗？`)) return; try { await db.removeRecord(record.id); if (viewing?.id === record.id) setViewing(undefined); setStatus('记录已删除。'); restoreFocus() } catch { setStatus('删除失败，请检查本地数据后重试。') } }
+  const applyDraft = () => {
+    if (draftErrors.length) return
+    update({ category: draft.category || undefined, start: draft.start || undefined, end: draft.end || undefined, min: draft.min || undefined, max: draft.max || undefined, sort: draft.sort === 'date-desc' ? undefined : draft.sort })
+    chooseVehicle(draft.vehicleId)
+    closeFilters()
+  }
+  const clearFilters = () => {
+    update({ query: undefined, category: undefined, start: undefined, end: undefined, min: undefined, max: undefined, sort: undefined }, true)
+    setDraft({ vehicleId: activeVehicleId, category: '', start: '', end: '', min: '', max: '', sort: 'date-desc' })
+  }
+  useEffect(() => {
+    if (!filtersOpen && !viewing && !editing && !copying) return
+    const keepFocusInDrawer = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (copying) closeCopying()
+        else if (editing) closeEditing()
+        else if (viewing) closeViewing()
+        else closeFilters()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusable = Array.from(drawerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])
+      const first = focusable[0], last = focusable.at(-1)
+      if (!first || !last) return
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    window.addEventListener('keydown', keepFocusInDrawer)
+    return () => window.removeEventListener('keydown', keepFocusInDrawer)
+  }, [copying, editing, filtersOpen, viewing])
+  const recordEntryUrl = activeVehicleId === ALL ? '/record' : `/record?vehicle=${encodeURIComponent(activeVehicleId)}`
+  const conditionSummary = [
+    activeVehicleId === ALL ? '全部车辆' : `车辆：${data.vehicles.find(vehicle => vehicle.id === activeVehicleId)?.name ?? '已选车辆'}`,
+    query && `关键词：${query}`,
+    category && `类别：${categoryLabels[category]}`,
+    start && `开始：${start}`,
+    end && `结束：${end}`,
+    min && `最低：¥${min}`,
+    max && `最高：¥${max}`,
+    sort !== 'date-desc' && `排序：${recordSortLabels[sort]}`,
+  ].filter(Boolean).join(' · ')
+  const emptyState = !data.vehicles.length
+    ? <div className="record-empty"><p>还没有车辆，请先新增车辆后再记录费用。</p><Link to="/vehicles">新增车辆</Link></div>
+    : !data.records.length
+      ? <div className="record-empty"><p>还没有费用记录，先记录第一笔费用吧。</p><Link to={recordEntryUrl}>记录第一笔费用</Link></div>
+      : <div className="record-empty"><p>当前筛选条件下没有符合条件的记录。</p><p className="muted">当前条件：{conditionSummary}</p><div className="record-actions"><button type="button" onClick={event => openFilters(event.currentTarget)}>调整条件</button><button type="button" onClick={clearFilters}>清除筛选</button><Link to={recordEntryUrl}>记一笔</Link></div></div>
 
   return <section className="records-page">
-    <h2>详细记录</h2>
-    <div className="filters records-filters">
-      <label>车辆<select aria-label="详细记录车辆" value={data.selected} onChange={event => chooseVehicle(event.target.value)}><option value={ALL}>全部车辆</option>{data.vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicle.name}</option>)}</select></label>
-      <label>搜索<input aria-label="搜索记录" placeholder="搜索车辆、类别、商家或备注" value={query ?? ''} onChange={event => update({ query: event.target.value.trim() || undefined })} /></label>
-      <label>类别<select aria-label="类别筛选" value={category ?? ''} onChange={event => update({ category: event.target.value || undefined })}><option value="">全部类别</option>{categories.map(item => <option key={item} value={item}>{categoryLabels[item]}</option>)}</select></label>
-      <label>开始日期<input aria-label="开始日期" type="date" value={start ?? ''} onChange={event => update({ start: event.target.value || undefined })} /></label>
-      <label>结束日期<input aria-label="结束日期" type="date" value={end ?? ''} onChange={event => update({ end: event.target.value || undefined })} /></label>
-      <label>最低金额<input aria-label="最低金额" placeholder="最低金额" type="number" min="0" step="0.01" value={min ?? ''} onChange={event => update({ min: event.target.value || undefined })} /></label>
-      <label>最高金额<input aria-label="最高金额" placeholder="最高金额" type="number" min="0" step="0.01" value={max ?? ''} onChange={event => update({ max: event.target.value || undefined })} /></label>
-      <label>排序<select aria-label="排序" value={sort} onChange={event => update({ sort: event.target.value === 'date-asc' ? undefined : event.target.value })}>{recordSorts.map(item => <option key={item} value={item}>{recordSortLabels[item]}</option>)}</select></label>
-      <button onClick={() => update({ query: undefined, category: undefined, start: undefined, end: undefined, min: undefined, max: undefined, sort: undefined })}>清除全部</button>
-    </div>
-    {(vehicleId || query || category || start || end || min || max || sort !== 'date-asc') && <div className="active-filters" aria-label="已生效条件">{vehicleId && <button onClick={() => chooseVehicle(ALL)}>移除车辆筛选</button>}{query && <button onClick={() => update({ query: undefined })}>移除关键词筛选</button>}{category && <button onClick={() => update({ category: undefined })}>移除类别筛选</button>}{start && <button onClick={() => update({ start: undefined })}>移除开始日期筛选</button>}{end && <button onClick={() => update({ end: undefined })}>移除结束日期筛选</button>}{min && <button onClick={() => update({ min: undefined })}>移除最低金额筛选</button>}{max && <button onClick={() => update({ max: undefined })}>移除最高金额筛选</button>}{sort !== 'date-asc' && <button onClick={() => update({ sort: undefined })}>移除排序筛选</button>}</div>}
+    <div className="records-heading"><div><h2>详细记录</h2><p className="muted">快速查看、筛选和管理每一笔用车费用。</p></div></div>
+    <section className="records-overview" aria-label="记录结果概览"><span>筛选结果</span><strong>{records.length} 笔 · {formatMoney(totalCents(records))}</strong><p>{dateRange}</p></section>
+    <div className="records-controls"><label className="record-search"><span className="sr-only">搜索记录</span><input aria-label="搜索记录" placeholder="搜索车辆、类别、商家或备注" value={query ?? ''} onChange={event => update({ query: event.target.value.trim() || undefined }, true)} /></label><button type="button" className="record-sort-trigger" aria-label={`当前排序：${recordSortLabels[sort]}`} onClick={event => openFilters(event.currentTarget)}>{recordSortLabels[sort]}</button><button type="button" className="record-filter-trigger" aria-label={activeFilterCount ? `筛选，已生效 ${activeFilterCount} 项` : '筛选'} onClick={event => openFilters(event.currentTarget)}>筛选{activeFilterCount ? ` ${activeFilterCount}` : ''}</button></div>
+    {activeFilterCount > 0 && <div className="active-filters" aria-label="已生效条件">{validVehicle && <button type="button" onClick={() => chooseVehicle(ALL)}>移除车辆筛选</button>}{query && <button type="button" onClick={() => update({ query: undefined })}>移除关键词筛选</button>}{category && <button type="button" onClick={() => update({ category: undefined })}>移除类别筛选</button>}{start && <button type="button" onClick={() => update({ start: undefined })}>移除开始日期筛选</button>}{end && <button type="button" onClick={() => update({ end: undefined })}>移除结束日期筛选</button>}{min && <button type="button" onClick={() => update({ min: undefined })}>移除最低金额筛选</button>}{max && <button type="button" onClick={() => update({ max: undefined })}>移除最高金额筛选</button>}{sort !== 'date-desc' && <button type="button" onClick={() => update({ sort: undefined })}>移除排序筛选</button>}</div>}
+    {filtersOpen && <div ref={drawerRef} className="drawer record-filter-drawer" role="dialog" aria-modal="true" aria-label="筛选与排序"><div className="record-filter-heading"><h3>筛选与排序</h3><button type="button" autoFocus onClick={closeFilters}>关闭</button></div><div className="field"><label>车辆<select aria-label="详细记录车辆" value={draft.vehicleId} onChange={event => setDraft(value => ({ ...value, vehicleId: event.target.value }))}><option value={ALL}>全部车辆</option>{data.vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicle.name}</option>)}</select></label><label>类别<select aria-label="类别筛选" value={draft.category} onChange={event => setDraft(value => ({ ...value, category: event.target.value }))}><option value="">全部类别</option>{categories.map(item => <option key={item} value={item}>{categoryLabels[item]}</option>)}</select></label><label>开始日期<input aria-label="开始日期" type="date" value={draft.start} onChange={event => setDraft(value => ({ ...value, start: event.target.value }))} /></label><label>结束日期<input aria-label="结束日期" type="date" value={draft.end} onChange={event => setDraft(value => ({ ...value, end: event.target.value }))} /></label><label>最低金额<input aria-label="最低金额" placeholder="最低金额" type="number" min="0" step="0.01" value={draft.min} onChange={event => setDraft(value => ({ ...value, min: event.target.value }))} /></label><label>最高金额<input aria-label="最高金额" placeholder="最高金额" type="number" min="0" step="0.01" value={draft.max} onChange={event => setDraft(value => ({ ...value, max: event.target.value }))} /></label><label>排序<select aria-label="排序" value={draft.sort} onChange={event => setDraft(value => ({ ...value, sort: event.target.value as RecordSort }))}>{recordSorts.map(item => <option key={item} value={item}>{recordSortLabels[item]}</option>)}</select></label></div>{draftErrors.length > 0 && <div className="error" role="alert">{draftErrors.map(error => <p key={error}>{error}</p>)}</div>}<div className="record-filter-actions"><button type="button" onClick={clearFilters}>清除筛选</button><button type="button" disabled={draftErrors.length > 0} onClick={applyDraft}>查看 {previewCount} 条记录</button></div></div>}
     {errors.length > 0 && <div role="alert">{errors.map(error => <p key={error}>{error}</p>)}</div>}
     {status && <p className={status.includes('失败') ? 'error' : 'save-status'} role={status.includes('失败') ? 'alert' : 'status'}>{status}</p>}{highlightedId && <p className="record-highlight-note" role="status">已定位新记录。</p>}
-    {!hasRangeError && <><div className="metrics records-summary"><Metric label="记录数量" value={`${records.length} 笔`} /><Metric label="总金额" value={formatMoney(totalCents(records))} /><Metric label="平均单笔金额" value={records.length ? formatMoney(Math.round(totalCents(records) / records.length)) : '—'} /><Metric label="记录日期" value={dateRange} /></div>{viewing && <div className="drawer" role="dialog" aria-label="记录详情" aria-modal="true"><button onClick={closeViewing}>关闭</button><h3 ref={detailRef} tabIndex={-1}>记录详情</h3><p>发生时间：{formatDate(viewing.occurredAt)}</p><p>车辆：{data.vehicles.find(vehicle => vehicle.id === viewing.vehicleId)?.name ?? '已删除'}</p><p>类别：{categoryLabels[viewing.category]}</p><p>金额：{formatMoney(viewing.amountCents)}</p><p>里程：{viewing.mileage === undefined ? '未填写' : `${viewing.mileage} km`}</p>{viewing.merchantOrLocation && <p>商家或地点：{viewing.merchantOrLocation}</p>}{viewing.notes && <p>备注：{viewing.notes}</p>}{viewing.category === 'fuel' && <><p>加油量：{viewing.fuelLiters === undefined ? '未填写' : `${viewing.fuelLiters.toFixed(2)} L`}</p><p>油品标号：{viewing.fuelGrade ?? '未填写'}</p><p>单价：{viewing.unitPriceCents === undefined ? '未填写' : `${formatMoney(viewing.unitPriceCents)}/L`}</p><p>加满状态：{viewing.isFullFuel ? '已加满' : '未加满'}</p></>}{viewing.category === 'charge' && <><p>充电量：{viewing.chargeKwh === undefined ? '未填写' : `${viewing.chargeKwh.toFixed(2)} kWh`}</p><p>充电方式：{viewing.chargeMethod ?? '未填写'}</p><p>单价：{viewing.unitPriceCents === undefined ? '未填写' : `${formatMoney(viewing.unitPriceCents)}/kWh`}</p><p>充满状态：{viewing.isFullCharge ? '已充满' : '未充满'}</p></>}<p>创建时间：{viewing.createdAt ? new Date(viewing.createdAt).toLocaleString('zh-CN') : '—'}</p><p>更新时间：{viewing.updatedAt ? new Date(viewing.updatedAt).toLocaleString('zh-CN') : '—'}</p><div className="record-card-actions"><button onClick={editViewing}>编辑记录</button><button onClick={copyViewing}>复制为新记录</button><button onClick={() => void removeRecord(viewing)}>删除记录</button></div></div>}{editing && <div className="drawer" role="dialog" aria-label="编辑记录" aria-modal="true"><button autoFocus onClick={closeEditing}>关闭</button><RecordForm data={data} record={editing} done={() => { setEditing(undefined); setStatus('记录已更新。'); restoreFocus() }} /></div>}{copying && <div className="drawer" role="dialog" aria-label="复制记录" aria-modal="true"><button autoFocus onClick={closeCopying}>关闭</button><RecordForm data={data} copyFrom={copying} done={() => { setCopying(undefined); setStatus('已创建副本。'); restoreFocus() }} /></div>}{records.length ? <><p className="muted">已展示 {visibleRecords.length} / 共 {records.length} 条</p><table className="records-table" aria-label="详细记录列表"><thead><tr><th>日期</th><th>车辆</th><th>类别</th><th>金额</th><th>操作</th></tr></thead><tbody>{visibleRecords.map(record => <tr key={record.id} data-record-id={record.id}><td><button className="record-view" aria-label={`查看${formatDate(record.occurredAt)}${categoryLabels[record.category]}记录`} onClick={event => openViewing(record, event.currentTarget)}>{formatDate(record.occurredAt)}</button></td><td>{data.vehicles.find(vehicle => vehicle.id === record.vehicleId)?.name ?? '已删除'}</td><td>{categoryLabels[record.category]}</td><td>{formatMoney(record.amountCents)}</td><td><button onClick={event => openEditing(record, event.currentTarget)}>编辑</button><button onClick={() => void removeRecord(record)}>删除</button><button onClick={event => openCopying(record, event.currentTarget)}>复制</button></td></tr>)}</tbody></table><div className="records-cards" aria-label="详细记录卡片列表">{visibleRecords.map(record => <article className="record-card" key={record.id} data-record-id={record.id}><div className="record-card-heading"><button className="record-card-view" aria-label={`查看${formatDate(record.occurredAt)}${categoryLabels[record.category]}记录`} onClick={event => openViewing(record, event.currentTarget)}>{formatDate(record.occurredAt)} · {categoryLabels[record.category]}</button><strong>{formatMoney(record.amountCents)}</strong></div><p>{data.vehicles.find(vehicle => vehicle.id === record.vehicleId)?.name ?? '已删除'}{record.merchantOrLocation ? ` · ${record.merchantOrLocation}` : ''}</p>{record.notes && <p className="muted">备注：{record.notes}</p>}<div className="record-card-actions"><button onClick={event => openEditing(record, event.currentTarget)}>编辑</button><button onClick={() => void removeRecord(record)}>删除</button><button onClick={event => openCopying(record, event.currentTarget)}>复制</button></div></article>)}</div>{visibleRecords.length < records.length && <button onClick={() => setVisibleCount(count => count + 30)}>加载更多记录</button>}</> : <p>没有符合条件的记录。<Link to="/record">记一笔</Link></p>}</>}
+    {!hasRangeError && <>{viewing && <div ref={drawerRef} className="drawer" role="dialog" aria-label="记录详情" aria-modal="true"><button onClick={closeViewing}>关闭</button><h3 ref={detailRef} tabIndex={-1}>记录详情</h3><p>发生时间：{formatDate(viewing.occurredAt)}</p><p>车辆：{data.vehicles.find(vehicle => vehicle.id === viewing.vehicleId)?.name ?? '已删除'}</p><p>类别：{categoryLabels[viewing.category]}</p><p>金额：{formatMoney(viewing.amountCents)}</p><p>里程：{viewing.mileage === undefined ? '未填写' : `${viewing.mileage} km`}</p>{viewing.merchantOrLocation && <p>商家或地点：{viewing.merchantOrLocation}</p>}{viewing.notes && <p>备注：{viewing.notes}</p>}{viewing.category === 'fuel' && <><p>加油量：{viewing.fuelLiters === undefined ? '未填写' : `${viewing.fuelLiters.toFixed(2)} L`}</p><p>油品标号：{viewing.fuelGrade ?? '未填写'}</p><p>单价：{viewing.unitPriceCents === undefined ? '未填写' : `${formatMoney(viewing.unitPriceCents)}/L`}</p><p>加满状态：{viewing.isFullFuel ? '已加满' : '未加满'}</p></>}{viewing.category === 'charge' && <><p>充电量：{viewing.chargeKwh === undefined ? '未填写' : `${viewing.chargeKwh.toFixed(2)} kWh`}</p><p>充电方式：{viewing.chargeMethod ?? '未填写'}</p><p>单价：{viewing.unitPriceCents === undefined ? '未填写' : `${formatMoney(viewing.unitPriceCents)}/kWh`}</p><p>充满状态：{viewing.isFullCharge ? '已充满' : '未充满'}</p></>}<p>创建时间：{viewing.createdAt ? new Date(viewing.createdAt).toLocaleString('zh-CN') : '—'}</p><p>更新时间：{viewing.updatedAt ? new Date(viewing.updatedAt).toLocaleString('zh-CN') : '—'}</p><div className="record-detail-actions"><button onClick={editViewing}>编辑记录</button><button onClick={copyViewing}>复制为新记录</button></div><div className="record-detail-danger"><p>危险操作</p><button className="danger" onClick={() => void removeRecord(viewing)}>删除记录</button></div></div>}{editing && <div ref={drawerRef} className="drawer" role="dialog" aria-label="编辑记录" aria-modal="true"><button autoFocus onClick={closeEditing}>关闭</button><RecordForm data={data} record={editing} done={() => { setEditing(undefined); setStatus('记录已更新。'); restoreFocus() }} /></div>}{copying && <div ref={drawerRef} className="drawer" role="dialog" aria-label="复制记录" aria-modal="true"><button autoFocus onClick={closeCopying}>关闭</button><RecordForm data={data} copyFrom={copying} done={() => { setCopying(undefined); setStatus('已创建副本。'); restoreFocus() }} /></div>}{records.length ? <><p className="muted records-count">已显示 {visibleRecords.length} / 共 {records.length} 条</p><table className="records-table" aria-label="详细记录列表"><thead><tr><th>日期</th><th>车辆</th><th>类别</th><th>金额</th></tr></thead><tbody>{visibleRecords.map(record => <tr key={record.id} data-record-id={record.id} className={`record-row-action${record.id === highlightedId ? ' record-highlighted' : ''}`} tabIndex={0} onClick={event => { if ((event.target as HTMLElement).closest('button')) return; openViewing(record, event.currentTarget) }} onKeyDown={event => { if ((event.target as HTMLElement).closest('button') || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); openViewing(record, event.currentTarget) }}><td><button className="record-view" aria-label={`查看${formatDate(record.occurredAt)}${categoryLabels[record.category]}记录`} onClick={event => openViewing(record, event.currentTarget)}>{formatDate(record.occurredAt)}</button></td><td>{data.vehicles.find(vehicle => vehicle.id === record.vehicleId)?.name ?? '已删除'}</td><td>{categoryLabels[record.category]}</td><td>{formatMoney(record.amountCents)}</td></tr>)}</tbody></table><div className="records-cards" aria-label="详细记录卡片列表">{visibleRecords.map(record => <article className={`record-card${record.id === highlightedId ? ' record-highlighted' : ''}`} key={record.id} data-record-id={record.id}><button className="record-card-view" aria-label={`查看${formatDate(record.occurredAt)}${categoryLabels[record.category]}记录`} onClick={event => openViewing(record, event.currentTarget)}><span className="record-card-heading"><strong>{formatDate(record.occurredAt)} · {categoryLabels[record.category]}</strong><strong>{formatMoney(record.amountCents)}</strong></span><span className="record-card-meta">{data.vehicles.find(vehicle => vehicle.id === record.vehicleId)?.name ?? '已删除'}{record.merchantOrLocation ? ` · ${record.merchantOrLocation}` : ''}</span><span className="record-card-chevron" aria-hidden="true">›</span></button></article>)}</div>{visibleRecords.length < records.length && <button type="button" className="load-more-records" onClick={() => setVisibleCount(count => count + 10)}>加载更多记录</button>}</> : emptyState}</>}
   </section>
 }
 function Calendar({ data }: { data: Data }) {

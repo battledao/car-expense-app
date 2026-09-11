@@ -345,3 +345,65 @@ body { background: var(--ui-bg); color: var(--ui-text); }
 .analysis-detail-heading h2 { margin: 4px 0 0; }
 .analysis-detail-heading p { margin: 7px 0 0; }
 @media (max-width: 767px) { .analysis-entry-grid { grid-template-columns: 1fr; gap: 12px; } .analysis-entry-card { min-height: 96px; padding: 16px; } .analysis-entry-copy span { white-space: normal; } .analysis-detail-heading { margin-bottom: 16px; } }
+/* V1.16：详细记录采用查询优先，完整条件集中在筛选抽屉。 */
+.records-page { max-width: 980px; padding-top: 28px; }
+.records-heading h2 { margin-bottom: 6px; font-size: 27px; letter-spacing: -.045em; }
+.records-heading p { margin: 0; }
+.records-overview { display: grid; gap: 5px; margin: 20px 0 14px; padding: 18px 20px; border: 1px solid #cbe5e2; border-radius: 18px; background: linear-gradient(112deg, #fff 16%, #edf9f8 100%); box-shadow: var(--ui-shadow); }
+.records-overview span, .records-overview p { margin: 0; color: var(--ui-muted); font-size: 13px; }
+.records-overview strong { color: var(--ui-teal-strong); font-size: 23px; letter-spacing: -.025em; }
+.records-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; margin-bottom: 12px; }
+.record-search input { width: 100%; min-height: 44px; border-color: var(--ui-line); border-radius: 12px; background: var(--ui-surface); }
+.record-sort-trigger, .record-filter-trigger { min-height: 44px; border-color: var(--ui-line); background: var(--ui-surface); color: var(--ui-text); font-weight: 700; white-space: nowrap; }
+.record-filter-trigger { border-color: var(--ui-teal); background: var(--ui-teal); color: #fff; }
+.record-filter-trigger:hover { background: var(--ui-teal-strong); }
+.active-filters { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 14px; }
+.active-filters button { min-height: 32px; padding: 4px 9px; border-color: #b9dbd8; border-radius: 999px; color: var(--ui-teal-strong); background: #f0faf9; font-size: 12px; }
+.records-count { margin: 14px 0 8px; }
+.records-table { overflow: hidden; border: 1px solid var(--ui-line); border-radius: 16px; box-shadow: var(--ui-shadow); }
+.records-table th { color: var(--ui-muted); font-size: 13px; font-weight: 650; }
+.records-table td { padding-top: 13px; padding-bottom: 13px; }
+.records-table tbody tr:hover { background: #f6fbfb; }
+.load-more-records { display: block; min-width: 164px; min-height: 44px; margin: 16px auto 0; border-color: #b9dbd8; color: var(--ui-teal-strong); background: #f0faf9; font-weight: 700; }
+.record-filter-drawer, .records-page > .drawer { z-index: 30; }
+.record-filter-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.record-filter-heading h3 { margin: 0; font-size: 22px; }
+.record-filter-drawer .field { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.record-filter-drawer input, .record-filter-drawer select { width: 100%; min-height: 42px; }
+.record-filter-actions, .record-detail-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.record-filter-actions button, .record-detail-actions button { min-height: 44px; font-weight: 700; }
+.record-filter-actions button:last-child, .record-detail-actions button:first-child { color: #fff; border-color: var(--ui-teal); background: var(--ui-teal); }
+.record-filter-actions button:last-child:hover, .record-detail-actions button:first-child:hover { background: var(--ui-teal-strong); }
+.record-detail-danger { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--ui-line); }
+.record-detail-danger p { margin: 0 0 10px; color: #a41d2d; font-size: 13px; font-weight: 700; }
+.record-detail-danger .danger { min-height: 44px; color: #a41d2d; border-color: #d7a5ad; background: #fff; font-weight: 700; }
+.record-detail-danger .danger:hover { background: #fff0f1; }
+.record-row-action { cursor: pointer; }
+.record-row-action:focus { outline: 3px solid #8ed9d4; outline-offset: -3px; }
+.record-highlighted { outline: 3px solid #b87319; outline-offset: -3px; box-shadow: 0 0 0 4px #fff6d9; }
+.record-row-action.record-highlighted td { background: #fffaf0; }
+
+@media (max-width: 767px) {
+  .records-table { display: none; }
+  .records-cards { display: grid; gap: 12px; }
+  .records-page { padding-top: 21px; }
+  .records-heading h2 { font-size: 25px; }
+  .records-overview { margin-top: 16px; padding: 17px 18px; }
+  .records-controls { grid-template-columns: minmax(0, 1fr) auto; }
+  .record-search { grid-column: 1 / -1; }
+  .record-sort-trigger, .record-filter-trigger { min-width: 0; }
+  .record-filter-drawer, .records-page > .drawer { top: auto; right: 0; bottom: 0; left: 0; width: 100%; height: auto; max-height: min(82dvh, 760px); padding: 20px max(20px, env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); border-radius: 24px 24px 0 0; box-shadow: 0 -12px 32px #15314a24; }
+  .record-filter-drawer .field { grid-template-columns: 1fr; gap: 12px; }
+  .record-filter-actions { position: sticky; bottom: -84px; padding-top: 12px; padding-bottom: 4px; background: linear-gradient(180deg, #ffffffd9, #fff 28%); }
+  .record-filter-actions button { flex: 1 1 140px; }
+  .record-card { padding: 0; overflow: hidden; border-color: var(--ui-line); border-radius: 16px; box-shadow: var(--ui-shadow); }
+  .record-card-view { position: relative; display: grid; gap: 8px; width: 100%; min-height: 102px; padding: 16px 44px 16px 16px; color: var(--ui-text); font-weight: 400; }
+  .record-card-view:hover { color: var(--ui-text); background: #f6fbfb; }
+  .record-card-heading { width: 100%; align-items: baseline; }
+  .record-card-heading strong:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .record-card-heading strong:last-child { flex: 0 0 auto; color: var(--ui-teal-strong); font-size: 17px; }
+  .record-card-meta { overflow: hidden; color: var(--ui-muted); font-size: 13px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+  .record-card-chevron { position: absolute; top: 50%; right: 16px; color: #91a3ae; font-size: 28px; font-weight: 400; line-height: 1; transform: translateY(-50%); }
+  .load-more-records { width: 100%; margin-top: 14px; }
+  .record-detail-actions button { flex: 1 1 130px; }
+}
