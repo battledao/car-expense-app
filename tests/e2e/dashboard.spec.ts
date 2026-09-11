@@ -40,6 +40,10 @@ test('formats the dashboard trend axis in yuan instead of internal cents', async
   await expect(chart.getByRole('application')).not.toContainText('250000')
 
   await page.goto('/analysis?range=all')
+  const trendCard = page.getByRole('link', { name: /费用趋势/ })
+  await expect(trendCard).toContainText('¥9020.00')
+  await expect(trendCard).not.toContainText('902000')
+  await trendCard.click()
   const analysisChart = page.getByRole('img', { name: '费用趋势图' })
   await expect(analysisChart.getByRole('application')).toContainText('¥2,500')
   await expect(analysisChart.getByRole('application')).not.toContainText('250000')

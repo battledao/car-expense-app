@@ -18,6 +18,7 @@ test('enters analysis child pages, preserves filters, and reflects record edits 
   await page.getByLabel('分析类别').selectOption('parking')
   await expect(page.locator('.metric').filter({ hasText: '总费用' })).toContainText('¥20.00')
   await expect(page.getByRole('img', { name: '费用趋势图' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '查看详细记录' })).toHaveCount(0)
 
   await page.getByRole('link', { name: /费用类别构成/ }).click()
   await expect(page).toHaveURL(/\/analysis\/categories\?/)
