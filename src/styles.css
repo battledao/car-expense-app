@@ -168,6 +168,7 @@ body { background: var(--ui-bg); color: var(--ui-text); }
 .dashboard-page .metrics .metric:not(:first-child) strong { margin-top: 9px; font-size: 23px; }
 .dashboard-page > .muted { margin: 10px 0 24px; color: var(--ui-muted); }
 .dashboard-page .grid-two { gap: 18px; margin-top: 18px; }
+.dashboard-page .grid-two > .panel:only-child { grid-column: 1 / -1; }
 .dashboard-page .panel > h3, .dashboard-page .panel > header h3 { color: var(--ui-text); font-size: 19px; }
 .dashboard-page .energy-chart { border-radius: 13px; background: linear-gradient(180deg, #f9fdfd, #fff); }
 .dashboard-page .trend-points { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; color: var(--ui-muted); font-size: 12px; }

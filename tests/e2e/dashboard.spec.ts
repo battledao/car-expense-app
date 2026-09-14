@@ -61,3 +61,34 @@ test('keeps the dashboard controls usable on a narrow screen', async ({ page }) 
   await page.goto('/')
   await expect(page.getByLabel('首页月份')).toBeVisible()
 })
+
+test('only renders actionable dashboard reminders and fills the empty grid space', async ({ page }) => {
+  const browserErrors: string[] = []
+  page.on('console', message => { if (message.type() === 'error') browserErrors.push(message.text()) })
+  page.on('pageerror', error => browserErrors.push(error.message))
+  await page.goto('/vehicles')
+  await page.getByRole('button', { name: '新增车辆' }).click()
+  await page.getByLabel('车辆名称').fill('提醒验收车')
+  await page.getByLabel('初始里程（km）').fill('0')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.getByLabel('金额（元）').fill('20')
+  await page.getByLabel('发生时间').fill('2026-08-15T12:00')
+  await page.getByRole('button', { name: '保存并查看记录' }).click()
+  await page.goto('/')
+  await page.getByLabel('首页月份').fill('2026-08')
+
+  await expect(page.getByRole('heading', { name: '提醒' })).toHaveCount(0)
+  const recentPanel = page.getByRole('heading', { name: '最近记录' }).locator('..')
+  const recentGrid = recentPanel.locator('..')
+  await expect.poll(async () => {
+    const [panel, grid] = await Promise.all([recentPanel.boundingBox(), recentGrid.boundingBox()])
+    return panel && grid ? Math.abs(panel.width - grid.width) : Number.POSITIVE_INFINITY
+  }).toBeLessThanOrEqual(1)
+
+  await page.getByLabel('首页月份').fill('2026-09')
+  const reminder = page.getByRole('heading', { name: '提醒' }).locator('..')
+  await expect(reminder).toContainText('本月暂无用车记录。')
+  await expect(reminder.getByRole('link', { name: '记一笔' })).toHaveAttribute('href', '/record')
+  expect(browserErrors).toEqual([])
+})

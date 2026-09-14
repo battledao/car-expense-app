@@ -330,6 +330,31 @@ it('shows month-aware dashboard metrics for one vehicle and active vehicle count
   fireEvent.change(screen.getByLabelText('当前车辆'), { target: { value: 'all' } })
   await waitFor(() => expect(screen.getByText('活跃车辆').closest('.metric')).toHaveTextContent('2 辆'))
 })
+it('only shows dashboard reminders when the user can take action', async () => {
+  await db.saveVehicle({ id: 'v1', name: '提醒测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveRecord({ id: 'parking', vehicleId: 'v1', category: 'parking', amountCents: 2000, occurredAt: '2026-08-02T10:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter><App /></MemoryRouter>)
+
+  const dashboardMonth = await screen.findByLabelText('首页月份')
+  fireEvent.change(dashboardMonth, { target: { value: '2026-08' } })
+  expect(screen.queryByRole('heading', { name: '提醒' })).not.toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: '最近记录' }).closest('.grid-two')?.children).toHaveLength(1)
+
+  fireEvent.change(dashboardMonth, { target: { value: '2026-09' } })
+  const reminder = screen.getByRole('heading', { name: '提醒' }).closest('.panel') as HTMLElement
+  expect(within(reminder).getByText('本月暂无用车记录。')).toBeInTheDocument()
+  expect(within(reminder).getByRole('link', { name: '记一笔' })).toHaveAttribute('href', '/record')
+})
+it('links incomplete energy reminders to the energy details', async () => {
+  await db.saveVehicle({ id: 'v1', name: '能耗提醒车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveRecord({ id: 'fuel', vehicleId: 'v1', category: 'fuel', amountCents: 20000, occurredAt: '2026-08-02T10:00', mileage: 1000, fuelLiters: 40, isFullFuel: true, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter><App /></MemoryRouter>)
+
+  fireEvent.change(await screen.findByLabelText('首页月份'), { target: { value: '2026-08' } })
+  const reminder = screen.getByRole('heading', { name: '提醒' }).closest('.panel') as HTMLElement
+  expect(within(reminder).getByText(/能耗数据尚未形成完整区间/)).toBeInTheDocument()
+  expect(within(reminder).getByRole('link', { name: '查看能耗详情' })).toHaveAttribute('href', '/energy')
+})
 it('applies dashboard record URL filters when opening detailed records', async () => {
   await db.saveVehicle({ id: 'v1', name: '筛选测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   await db.saveRecord({ id: 'in', vehicleId: 'v1', category: 'parking', amountCents: 1200, occurredAt: '2026-08-02T10:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
