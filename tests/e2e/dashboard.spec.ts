@@ -14,6 +14,8 @@ test('filters dashboard records by month and keeps the filter in detailed record
   await page.getByLabel('首页月份').fill('2026-08')
 
   await expect(page.getByRole('img', { name: '近六个月费用趋势图' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '车辆与能耗摘要' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '查看能耗详情' })).toHaveCount(0)
   await expect(page.locator('.metric').filter({ hasText: '本月费用' })).toContainText('¥25.00')
   await page.getByRole('link', { name: '查看本月记录' }).click()
   await page.getByRole('button', { name: /^筛选(?:，已生效 \d+ 项)?$/ }).click()

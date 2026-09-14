@@ -102,10 +102,13 @@ it('shows analysis summary, previous-period change and single-vehicle cost per k
   expect(screen.getByText('每公里综合成本').closest('.metric')).toHaveTextContent('¥0.30/km')
 })
 
-it('uses three analysis entry cards instead of rendering complete detail modules on the home page', async () => {
+it('uses four analysis entry cards and keeps energy on its independent twelve-month scope', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-09-14T12:00:00').getTime())
   await db.saveVehicle({ id: 'analysis-cards', name: '卡片入口车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   await db.settings.put({ id: 'app', selectedVehicleId: 'analysis-cards', defaultVehicleId: 'analysis-cards' })
   await db.saveRecord({ id: 'analysis-card-record', vehicleId: 'analysis-cards', category: 'parking', amountCents: 2000, occurredAt: '2026-01-10T10:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  await db.saveRecord({ id: 'analysis-fuel-start', vehicleId: 'analysis-cards', category: 'fuel', amountCents: 20000, occurredAt: '2026-07-01T10:00', mileage: 1000, fuelLiters: 40, isFullFuel: true, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  await db.saveRecord({ id: 'analysis-fuel-end', vehicleId: 'analysis-cards', category: 'fuel', amountCents: 16000, occurredAt: '2026-08-01T10:00', mileage: 1500, fuelLiters: 40, isFullFuel: true, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
 
   render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-31&category=parking']}><App /></MemoryRouter>)
 
@@ -115,9 +118,61 @@ it('uses three analysis entry cards instead of rendering complete detail modules
   expect(trend).toHaveAttribute('href', expect.stringContaining('vehicle=analysis-cards'))
   expect(screen.getByRole('link', { name: /月份费用对比/ })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: /费用类别构成/ })).toBeInTheDocument()
+  const energy = screen.getByRole('link', { name: /能耗分析/ })
+  expect(energy).toHaveTextContent('近12个月 · 平均油耗 8.00 L/100km · ¥0.32/km')
+  expect(energy).toHaveAttribute('href', '/energy?vehicle=analysis-cards')
+  expect(document.querySelectorAll('.analysis-entry-card')).toHaveLength(4)
   expect(screen.queryByRole('img', { name: '费用趋势图' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /查看完整趋势|查看全部月份|查看全部类别/ })).not.toBeInTheDocument()
   expect(screen.queryByRole('link', { name: '查看详细记录' })).not.toBeInTheDocument()
+})
+
+it('shows electric and hybrid energy summaries without creating combined consumption', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-09-14T12:00:00').getTime())
+  await db.saveVehicle({ id: 'electric-card', name: '分析电动车', energyType: 'electric', initialMileage: 0, isDefault: true })
+  await db.saveVehicle({ id: 'hybrid-card', name: '分析插混车', energyType: 'hybrid', initialMileage: 0 })
+  const base = { excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'electric-start', vehicleId: 'electric-card', category: 'charge', amountCents: 5000, occurredAt: '2026-07-01T10:00', mileage: 1000, chargeKwh: 50, isFullCharge: true })
+  await db.saveRecord({ ...base, id: 'electric-end', vehicleId: 'electric-card', category: 'charge', amountCents: 6000, occurredAt: '2026-08-01T10:00', mileage: 1500, chargeKwh: 60, isFullCharge: true })
+  await db.saveRecord({ ...base, id: 'hybrid-fuel-start', vehicleId: 'hybrid-card', category: 'fuel', amountCents: 20000, occurredAt: '2026-05-01T10:00', mileage: 1000, fuelLiters: 40, isFullFuel: true })
+  await db.saveRecord({ ...base, id: 'hybrid-fuel-end', vehicleId: 'hybrid-card', category: 'fuel', amountCents: 16000, occurredAt: '2026-06-01T10:00', mileage: 1500, fuelLiters: 40, isFullFuel: true })
+  await db.saveRecord({ ...base, id: 'hybrid-charge-start', vehicleId: 'hybrid-card', category: 'charge', amountCents: 5000, occurredAt: '2026-07-01T10:00', mileage: 1500, chargeKwh: 50, isFullCharge: true })
+  await db.saveRecord({ ...base, id: 'hybrid-charge-end', vehicleId: 'hybrid-card', category: 'charge', amountCents: 6000, occurredAt: '2026-08-01T10:00', mileage: 2000, chargeKwh: 60, isFullCharge: true })
+
+  const { unmount } = render(<MemoryRouter initialEntries={['/analysis?vehicle=electric-card']}><App /></MemoryRouter>)
+  expect(await screen.findByRole('link', { name: /能耗分析/ })).toHaveTextContent('平均电耗 12.00 kWh/100km · ¥0.12/km')
+  unmount()
+  render(<MemoryRouter initialEntries={['/analysis?vehicle=hybrid-card']}><App /></MemoryRouter>)
+  const hybrid = await screen.findByRole('link', { name: /能耗分析/ })
+  expect(hybrid).toHaveTextContent('油耗 8.00 L/100km · 电耗 12.00 kWh/100km')
+  expect(hybrid).not.toHaveTextContent('综合能耗')
+})
+
+it('counts vehicles with usable energy data and explains an unavailable selected vehicle', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-09-14T12:00:00').getTime())
+  await db.saveVehicle({ id: 'usable', name: '有能耗车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveVehicle({ id: 'unavailable', name: '缺数据车', energyType: 'electric', initialMileage: 0 })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'all', defaultVehicleId: 'usable' })
+  const base = { vehicleId: 'usable', category: 'fuel' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'usable-start', amountCents: 20000, occurredAt: '2026-07-01T10:00', mileage: 1000, fuelLiters: 40, isFullFuel: true })
+  await db.saveRecord({ ...base, id: 'usable-end', amountCents: 16000, occurredAt: '2026-08-01T10:00', mileage: 1500, fuelLiters: 40, isFullFuel: true })
+
+  const { unmount } = render(<MemoryRouter initialEntries={['/analysis']}><App /></MemoryRouter>)
+  expect(await screen.findByRole('link', { name: /能耗分析/ })).toHaveTextContent('近12个月 · 1 辆车有可用能耗数据')
+  unmount()
+  render(<MemoryRouter initialEntries={['/analysis?vehicle=unavailable']}><App /></MemoryRouter>)
+  expect(await screen.findByRole('link', { name: /能耗分析/ })).toHaveTextContent('暂无可计算的能耗数据 · 尚无充电记录。')
+})
+
+it('shows an actionable empty energy summary for all vehicles when none can be calculated', async () => {
+  await db.saveVehicle({ id: 'empty-energy', name: '暂无能耗车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'all', defaultVehicleId: 'empty-energy' })
+
+  render(<MemoryRouter initialEntries={['/analysis']}><App /></MemoryRouter>)
+
+  const energy = await screen.findByRole('link', { name: /能耗分析/ })
+  expect(energy).toHaveTextContent('近12个月 · 暂无可计算的能耗数据')
+  expect(energy).toHaveAttribute('href', '/energy')
 })
 
 it('shows the complete continuous trend and drill-down links in its own child page', async () => {
@@ -644,16 +699,17 @@ it('keeps dashboard trend details out of the home page and expands expense categ
   fireEvent.click(screen.getByRole('button', { name: '显示全部类别' }))
   expect(screen.getByRole('link', { name: '加油' })).toBeInTheDocument()
 })
-it('shows a vehicle-specific energy summary without mixing other vehicles', async () => {
+it('keeps current mileage but removes the vehicle energy summary from the dashboard', async () => {
   await db.saveVehicle({ id: 'v1', name: '能耗首页车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   await db.saveRecord({ id: 'start', vehicleId: 'v1', category: 'fuel', amountCents: 20000, occurredAt: '2026-07-30T10:00', mileage: 1000, fuelLiters: 40, isFullFuel: true, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
   await db.saveRecord({ id: 'end', vehicleId: 'v1', category: 'fuel', amountCents: 16000, occurredAt: '2026-08-20T10:00', mileage: 1500, fuelLiters: 40, isFullFuel: true, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
   render(<MemoryRouter><App /></MemoryRouter>)
 
   fireEvent.change(await screen.findByLabelText('首页月份'), { target: { value: '2026-08' } })
-  expect(screen.getByRole('heading', { name: '车辆与能耗摘要' })).toBeInTheDocument()
-  expect(screen.getByText('平均油耗：8.00 L/100km')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: '查看能耗详情' })).toHaveAttribute('href', '/energy')
+  expect(screen.getByText('当前里程').closest('.metric')).toHaveTextContent('1500 km')
+  expect(screen.queryByRole('heading', { name: '车辆与能耗摘要' })).not.toBeInTheDocument()
+  expect(screen.queryByText('平均油耗：8.00 L/100km')).not.toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: '查看能耗详情' })).not.toBeInTheDocument()
 })
 it('opens a recent record detail and provides an edit entry from the dashboard', async () => {
   await db.saveVehicle({ id: 'v1', name: '最近记录车', energyType: 'fuel', initialMileage: 0, isDefault: true })
@@ -774,6 +830,34 @@ it('provides vehicle-aware energy controls and a twelve-month default range', as
   fireEvent.change(screen.getByLabelText('能耗时间范围'), { target: { value: 'custom' } })
   expect(screen.getByLabelText('能耗开始日期')).toBeInTheDocument()
   expect(screen.getByLabelText('能耗结束日期')).toBeInTheDocument()
+})
+
+it('opens energy for the analysis vehicle and returns to the original filters', async () => {
+  await db.saveVehicle({ id: 'global-fuel', name: '全局燃油车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveVehicle({ id: 'analysis-electric', name: '分析指定电车', energyType: 'electric', initialMileage: 0 })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'global-fuel', defaultVehicleId: 'global-fuel' })
+  render(<MemoryRouter initialEntries={['/analysis?range=custom&start=2026-01-01&end=2026-01-31&category=charge&vehicle=analysis-electric']}><App /></MemoryRouter>)
+
+  fireEvent.click(await screen.findByRole('link', { name: /能耗分析/ }))
+  await waitFor(() => expect(screen.getByRole('heading', { name: '能耗统计' })).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByLabelText('能耗车辆')).toHaveValue('analysis-electric'))
+  expect(screen.getByLabelText('能耗时间范围')).toHaveValue('twelve')
+  fireEvent.click(screen.getByRole('button', { name: '返回数据分析' }))
+  await waitFor(() => expect(screen.getByRole('heading', { name: '数据分析' })).toBeInTheDocument())
+  expect(screen.getByLabelText('时间范围')).toHaveValue('custom')
+  expect(screen.getByLabelText('分析开始日期')).toHaveValue('2026-01-01')
+  expect(screen.getByLabelText('分析结束日期')).toHaveValue('2026-01-31')
+  expect(screen.getByLabelText('分析类别')).toHaveValue('charge')
+  expect(screen.getByLabelText('分析车辆')).toHaveValue('analysis-electric')
+})
+
+it('safely ignores an invalid energy vehicle parameter', async () => {
+  await db.saveVehicle({ id: 'fallback-fuel', name: '回退燃油车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.settings.put({ id: 'app', selectedVehicleId: 'fallback-fuel', defaultVehicleId: 'fallback-fuel' })
+  render(<MemoryRouter initialEntries={['/energy?vehicle=missing']}><App /></MemoryRouter>)
+
+  await waitFor(() => expect(screen.getByLabelText('能耗车辆')).toHaveValue('fallback-fuel'))
+  expect(screen.queryByText('已删除车辆')).not.toBeInTheDocument()
 })
 
 it('asks for a concrete vehicle when the global selection is all vehicles', async () => {

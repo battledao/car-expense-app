@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analysisCategories, analysisCostPerKm, analysisDateRange, analysisMonths, analysisSummary, analysisTrend, analysisVehicles, averageEnergy, byCategory, costPerKm, energyDateRange, energyIntervals, energyQuality, energySummary, energyUnitPriceCents, filterEnergyIntervals, filterRecords, hybridEnergyCost, monthSummary, monthlyCostPerKm, monthlyTrend, totalCents } from './calculations'
+import { analysisCategories, analysisCostPerKm, analysisDateRange, analysisMonths, analysisSummary, analysisTrend, analysisVehicles, averageEnergy, byCategory, costPerKm, energyDateRange, energyIntervals, energyQuality, energySummary, energyUnavailableReason, energyUnitPriceCents, filterEnergyIntervals, filterRecords, hybridEnergyCost, monthSummary, monthlyCostPerKm, monthlyTrend, totalCents, vehicleEnergySummary, vehiclesWithEnergyData } from './calculations'
 import type { ExpenseRecord, Vehicle } from './models'
 
 const vehicle: Vehicle = { id: 'v1', name: '车', energyType: 'fuel', initialMileage: 1000, isDefault: true, createdAt: '', updatedAt: '' }
@@ -20,6 +20,42 @@ describe('calculations', () => {
     expect(analysisDateRange('custom', now, records, '', '2026-01-10')).toEqual({ error: '请选择开始和结束日期。' })
     expect(analysisDateRange('custom', now, records, '2026-01-11', '2026-01-10')).toEqual({ error: '开始日期不能晚于结束日期。' })
     expect(analysisDateRange('custom', now, records, '2024-02-29', '2024-03-01')).toEqual({ start: '2024-02-29', end: '2024-03-01' })
+  })
+
+  it('summarizes the last twelve months by vehicle energy type without mixing units', () => {
+    const fuelVehicle = { ...vehicle, id: 'fuel', energyType: 'fuel' as const }, electricVehicle = { ...vehicle, id: 'electric', energyType: 'electric' as const }, hybridVehicle = { ...vehicle, id: 'hybrid', energyType: 'hybrid' as const }, oldVehicle = { ...vehicle, id: 'old', energyType: 'fuel' as const }
+    const energyRecord = (id: string, vehicleId: string, category: 'fuel' | 'charge', occurredAt: string, mileage: number, quantity: number, amountCents: number): ExpenseRecord => ({ ...record(id, { vehicleId, category, occurredAt, mileage, amountCents }), ...(category === 'fuel' ? { fuelLiters: quantity, isFullFuel: true } : { chargeKwh: quantity, isFullCharge: true }) })
+    const records = [
+      energyRecord('fuel-start', 'fuel', 'fuel', '2026-01-01T10:00', 1000, 50, 25000),
+      energyRecord('fuel-end', 'fuel', 'fuel', '2026-02-01T10:00', 1500, 40, 20000),
+      energyRecord('electric-start', 'electric', 'charge', '2026-03-01T10:00', 2000, 50, 5000),
+      energyRecord('electric-end', 'electric', 'charge', '2026-04-01T10:00', 2500, 60, 6000),
+      energyRecord('hybrid-fuel-start', 'hybrid', 'fuel', '2026-01-01T10:00', 1000, 50, 25000),
+      energyRecord('hybrid-fuel-end', 'hybrid', 'fuel', '2026-02-01T10:00', 1500, 40, 20000),
+      energyRecord('hybrid-charge-start', 'hybrid', 'charge', '2026-03-01T10:00', 1500, 50, 5000),
+      energyRecord('hybrid-charge-end', 'hybrid', 'charge', '2026-04-01T10:00', 2000, 60, 6000),
+      energyRecord('outside-start', 'old', 'fuel', '2024-01-01T10:00', 0, 100, 10000),
+      energyRecord('outside-end', 'old', 'fuel', '2024-02-01T10:00', 100, 100, 10000),
+    ]
+    const now = new Date(2026, 8, 14, 12)
+
+    expect(vehicleEnergySummary(fuelVehicle, records, now)).toMatchObject({ fuel: { average: 8, costPerKm: 40 }, charge: undefined })
+    expect(vehicleEnergySummary(electricVehicle, records, now)).toMatchObject({ fuel: undefined, charge: { average: 12, costPerKm: 12 } })
+    expect(vehicleEnergySummary(hybridVehicle, records, now)).toMatchObject({ fuel: { average: 8 }, charge: { average: 12 } })
+    expect(vehicleEnergySummary(oldVehicle, records, now)).toEqual({ fuel: undefined, charge: undefined })
+    expect(vehiclesWithEnergyData([fuelVehicle, electricVehicle, hybridVehicle, oldVehicle], records, now)).toBe(3)
+  })
+
+  it('explains why energy cannot yet be calculated', () => {
+    expect(energyUnavailableReason([], 'fuel')).toBe('尚无加油记录。')
+    expect(energyUnavailableReason([record('excluded', { category: 'fuel', excludedFromEnergy: true, fuelLiters: 10 })], 'fuel')).toBe('全部补能记录已排除。')
+    expect(energyUnavailableReason([record('missing-mileage', { category: 'charge', chargeKwh: 10, isFullCharge: true })], 'charge')).toBe('部分补能记录缺少里程。')
+    expect(energyUnavailableReason([record('missing-quantity', { category: 'fuel', mileage: 1000, isFullFuel: true })], 'fuel')).toBe('部分补能记录缺少加油量。')
+    expect(energyUnavailableReason([
+      record('later-mileage', { category: 'fuel', occurredAt: '2026-07-01T10:00', mileage: 1200, fuelLiters: 10, isFullFuel: true }),
+      record('reversed-mileage', { category: 'fuel', occurredAt: '2026-08-01T10:00', mileage: 1100, fuelLiters: 10, isFullFuel: true }),
+    ], 'fuel')).toBe('补能记录里程重复或倒退。')
+    expect(energyUnavailableReason([record('unmarked', { category: 'fuel', mileage: 1000, fuelLiters: 10 })], 'fuel')).toContain('至少需要两次加满')
   })
 
   it('summarizes analysis over calendar months and an equal previous period', () => {

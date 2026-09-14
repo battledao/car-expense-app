@@ -53,6 +53,69 @@ test('enters analysis child pages, preserves filters, and reflects record edits 
   await page.getByRole('button', { name: '返回数据分析' }).click()
   await expect(page.locator('.metric').filter({ hasText: '总费用' })).toContainText('¥0.00')
 })
+
+test('moves the twelve-month vehicle energy summary from home into analysis and preserves filters on return', async ({ page }) => {
+  await page.goto('/vehicles')
+  await page.getByRole('button', { name: '新增车辆' }).click()
+  await page.getByLabel('车辆名称').fill('V1.17 能耗分析车')
+  await page.getByLabel('初始里程（km）').fill('0')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+
+  for (const entry of [
+    { date: '2026-07-01T10:00', mileage: '1000', amount: '200', liters: '40' },
+    { date: '2026-08-01T10:00', mileage: '1500', amount: '160', liters: '40' },
+  ]) {
+    await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
+    await page.getByRole('button', { name: '加油', exact: true }).click()
+    await page.getByLabel('金额（元）').fill(entry.amount)
+    await page.getByLabel('发生时间').fill(entry.date)
+    await page.getByLabel('当前里程（km）').fill(entry.mileage)
+    await page.getByLabel('加油量（升）').fill(entry.liters)
+    await page.getByLabel('已加满').check()
+    await page.getByRole('button', { name: '保存并查看记录' }).click()
+  }
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: '车辆与能耗摘要' })).toHaveCount(0)
+  await expect(page.locator('.metric').filter({ hasText: '当前里程' })).toContainText('1500 km')
+
+  await page.goto('/analysis?range=custom&start=2026-01-01&end=2026-01-31&category=parking')
+  const energyCard = page.getByRole('link', { name: /能耗分析/ })
+  await expect(page.locator('.analysis-entry-card')).toHaveCount(4)
+  await expect(energyCard).toContainText('近12个月 · 平均油耗 8.00 L/100km · ¥0.32/km')
+  await energyCard.click()
+  await expect(page).toHaveURL(/\/energy\?vehicle=/)
+  await expect(page.getByLabel('能耗车辆').locator('option:checked')).toHaveText('V1.17 能耗分析车')
+  await expect(page.getByLabel('能耗时间范围')).toHaveValue('twelve')
+  await expect(page.locator('.metric').filter({ hasText: '平均油耗' })).toContainText('8.00 L/100km')
+  await page.getByRole('button', { name: '返回数据分析' }).click()
+  await expect(page.getByLabel('时间范围')).toHaveValue('custom')
+  await expect(page.getByLabel('分析开始日期')).toHaveValue('2026-01-01')
+  await expect(page.getByLabel('分析结束日期')).toHaveValue('2026-01-31')
+  await expect(page.getByLabel('分析类别')).toHaveValue('parking')
+})
+
+test('summarizes an all-vehicle energy empty state and opens vehicle selection', async ({ page }) => {
+  await page.goto('/vehicles')
+  await page.getByRole('button', { name: '新增车辆' }).click()
+  await page.getByLabel('车辆名称').fill('暂无能耗车')
+  await page.getByLabel('初始里程（km）').fill('0')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+  const vehicleSelector = page.locator('main > header').getByLabel('当前车辆')
+  await vehicleSelector.selectOption('all')
+  await expect(vehicleSelector).toHaveValue('all')
+  await page.getByRole('link', { name: '数据分析', exact: true }).click()
+
+  const energyCard = page.getByRole('link', { name: /能耗分析/ })
+  await expect(energyCard).toContainText('近12个月 · 暂无可计算的能耗数据')
+  await energyCard.click()
+  await expect(page).toHaveURL(/\/energy$/)
+  await expect(page.getByRole('heading', { name: '能耗统计' })).toBeVisible()
+  await expect(page.getByText('请选择一辆具体车辆查看能耗统计。')).toBeVisible()
+  await expect(page.getByLabel('选择能耗车辆')).toBeVisible()
+  await expect(page.getByRole('button', { name: '返回数据分析' })).toBeVisible()
+})
+
 for (const deviceName of ['iPhone 14', 'Galaxy S9+']) {
   const { defaultBrowserType: _defaultBrowserType, ...device } = devices[deviceName]
 
@@ -72,7 +135,7 @@ for (const deviceName of ['iPhone 14', 'Galaxy S9+']) {
       await page.goto('/analysis?range=custom&start=2026-01-01&end=2026-01-31')
 
       const cards = page.locator('.analysis-entry-card')
-      await expect(cards).toHaveCount(3)
+      await expect(cards).toHaveCount(4)
       const [firstCard, secondCard] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()])
       expect(firstCard).not.toBeNull()
       expect(secondCard).not.toBeNull()

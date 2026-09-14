@@ -201,6 +201,26 @@ export function energySummary(intervals: EnergyInterval[]) {
   return { average: distance ? quantity / distance * 100 : undefined, recent, changePercent: recent !== undefined && previous ? (recent - previous) / previous * 100 : undefined, distance, quantity, costCents, costPerKm: distance ? costCents / distance : undefined, averageUnitPriceCents: quantity ? costCents / quantity : undefined }
 }
 
+export function vehicleEnergySummary(vehicle: Vehicle, records: ExpenseRecord[], now = new Date()) {
+  const scoped = records.filter(record => record.vehicleId === vehicle.id), range = energyDateRange('twelve', now)
+  const fuel = vehicle.energyType === 'electric' ? undefined : energySummary(filterEnergyIntervals(energyIntervals(scoped, 'fuel'), range))
+  const charge = vehicle.energyType === 'fuel' ? undefined : energySummary(filterEnergyIntervals(energyIntervals(scoped, 'charge'), range))
+  return { fuel: fuel?.average === undefined ? undefined : fuel, charge: charge?.average === undefined ? undefined : charge }
+}
+
+export const vehiclesWithEnergyData = (vehicles: Vehicle[], records: ExpenseRecord[], now = new Date()) => vehicles.filter(vehicle => { const summary = vehicleEnergySummary(vehicle, records, now); return summary.fuel || summary.charge }).length
+
+export function energyUnavailableReason(records: ExpenseRecord[], category: 'fuel' | 'charge') {
+  const relevant = records.filter(record => record.category === category)
+  if (!relevant.length) return `尚无${category === 'fuel' ? '加油' : '充电'}记录。`
+  if (relevant.every(record => record.excludedFromEnergy)) return '全部补能记录已排除。'
+  const quality = energyQuality(relevant, category)
+  if (quality.missingMileage) return '部分补能记录缺少里程。'
+  if (quality.missingQuantity) return `部分补能记录缺少${category === 'fuel' ? '加油量' : '充电量'}。`
+  if (quality.reversedMileage) return '补能记录里程重复或倒退。'
+  return `至少需要两次${category === 'fuel' ? '加满' : '充满'}且里程递增的补能记录。`
+}
+
 export function hybridEnergyCost(fuel: EnergyInterval[], charge: EnergyInterval[]) {
   const intervals = [...fuel, ...charge]
   if (!intervals.length) return undefined
