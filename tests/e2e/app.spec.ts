@@ -152,6 +152,7 @@ test('lays out the expense calendar without overlap on desktop and narrow screen
   await page.getByRole('link', { name: '费用日历' }).click()
 
   await expect(page.getByLabel('费用日历月份')).toBeVisible()
+  await expect(page.locator('.calendar-page .toolbar')).not.toContainText('费用日历月份')
   const desktopPanels = page.locator('.calendar-layout > .panel')
   const [calendarPanel, detailPanel] = await Promise.all([desktopPanels.nth(0).boundingBox(), desktopPanels.nth(1).boundingBox()])
   expect(calendarPanel).not.toBeNull()
