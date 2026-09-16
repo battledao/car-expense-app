@@ -1,4 +1,14 @@
-import { devices, expect, test } from '@playwright/test'
+import { devices, expect, test, type Page } from '@playwright/test'
+
+async function selectMobileCalendarMonth(page: Page, year: number, monthNumber: number) {
+  await page.getByRole('button', { name: '选择费用日历月份' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择月份' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('option', { name: `${year}年`, exact: true }).click()
+  await dialog.getByRole('option', { name: `${monthNumber}月`, exact: true }).click()
+  await dialog.getByRole('button', { name: '确定' }).click()
+  await expect(dialog).toBeHidden()
+}
 
 test('can navigate all primary modules and create a vehicle', async ({ page }) => {
   await page.goto('/')
@@ -155,22 +165,18 @@ test('lays out the expense calendar without overlap on desktop and narrow screen
   await expect(page.locator('.calendar-page .toolbar')).not.toContainText('费用日历月份')
   const currentMonth = await page.getByLabel('费用日历月份').inputValue()
   const historicalMonth = currentMonth === '2026-08' ? '2026-07' : '2026-08'
-  const returnCurrentMonth = page.getByRole('button', { name: '本月', exact: true })
-  await expect(returnCurrentMonth).toHaveCount(0)
+  await expect(page.locator('.calendar-toolbar')).not.toContainText('本月')
   await page.getByLabel('费用日历月份').fill(historicalMonth)
-  await expect(returnCurrentMonth).toBeVisible()
+  await expect(page.locator('.calendar-toolbar')).not.toContainText('本月')
   const desktopToolbarBoxes = await Promise.all([
     page.getByRole('button', { name: '上个月' }).boundingBox(),
     page.getByLabel('费用日历月份').boundingBox(),
     page.getByRole('button', { name: '下个月' }).boundingBox(),
-    returnCurrentMonth.boundingBox(),
   ])
   expect(desktopToolbarBoxes.every((box): box is NonNullable<typeof box> => box !== null)).toBe(true)
   const desktopToolbarCenters = desktopToolbarBoxes.map(box => box.y + box.height / 2)
   expect(Math.max(...desktopToolbarCenters) - Math.min(...desktopToolbarCenters)).toBeLessThanOrEqual(1)
-  await returnCurrentMonth.click()
-  await expect(page.getByLabel('费用日历月份')).toHaveValue(currentMonth)
-  await expect(returnCurrentMonth).toHaveCount(0)
+  await page.getByLabel('费用日历月份').fill(currentMonth)
   const desktopPanels = page.locator('.calendar-layout > .panel')
   const [calendarPanel, detailPanel] = await Promise.all([desktopPanels.nth(0).boundingBox(), desktopPanels.nth(1).boundingBox()])
   expect(calendarPanel).not.toBeNull()
@@ -184,11 +190,12 @@ test('lays out the expense calendar without overlap on desktop and narrow screen
   expect(firstDay!.x + firstDay!.width).toBeLessThanOrEqual(secondDay!.x)
 
   await page.setViewportSize({ width: 600, height: 900 })
-  await page.getByLabel('费用日历月份').fill(historicalMonth)
-  await expect(returnCurrentMonth).toBeHidden()
+  const [historicalYear, historicalMonthNumber] = historicalMonth.split('-').map(Number)
+  await selectMobileCalendarMonth(page, historicalYear, historicalMonthNumber)
+  await expect(page.locator('.calendar-toolbar')).not.toContainText('本月')
   const mobileToolbarBoxes = await Promise.all([
     page.getByRole('button', { name: '上个月' }).boundingBox(),
-    page.getByLabel('费用日历月份').boundingBox(),
+    page.getByRole('button', { name: '选择费用日历月份' }).boundingBox(),
     page.getByRole('button', { name: '下个月' }).boundingBox(),
   ])
   expect(mobileToolbarBoxes.every((box): box is NonNullable<typeof box> => box !== null)).toBe(true)
@@ -199,6 +206,70 @@ test('lays out the expense calendar without overlap on desktop and narrow screen
   expect(narrowDetail).not.toBeNull()
   expect(narrowCalendar!.y + narrowCalendar!.height).toBeLessThanOrEqual(narrowDetail!.y)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+  for (const width of [320, 375, 390, 414, 430]) {
+    await page.setViewportSize({ width, height: 844 })
+    const boxes = await Promise.all([
+      page.getByRole('button', { name: '上个月' }).boundingBox(),
+      page.getByRole('button', { name: '选择费用日历月份' }).boundingBox(),
+      page.getByRole('button', { name: '下个月' }).boundingBox(),
+    ])
+    expect(boxes.every((box): box is NonNullable<typeof box> => box !== null)).toBe(true)
+    const centers = boxes.map(box => box.y + box.height / 2)
+    expect(Math.max(...centers) - Math.min(...centers)).toBeLessThanOrEqual(1)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+  }
+})
+
+test('opens a mobile month sheet, keeps draft changes temporary and restores focus on close', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/vehicles')
+  await page.getByRole('button', { name: '新增车辆' }).click()
+  await page.getByLabel('车辆名称').fill('月份弹层车')
+  await page.getByLabel('初始里程（km）').fill('0')
+  await page.getByRole('button', { name: '保存车辆' }).click()
+  await page.goto('/calendar?month=2026-06&day=2026-06-15')
+
+  const trigger = page.getByRole('button', { name: '选择费用日历月份' })
+  await expect(trigger).toHaveText('2026年06月')
+  await expect(page.locator('input[type="month"]')).toHaveCount(0)
+  await trigger.click()
+  let dialog = page.getByRole('dialog', { name: '选择月份' })
+  await expect(dialog.getByRole('option', { name: '2026年', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(dialog.getByRole('option', { name: '6月', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await dialog.getByRole('option', { name: '2027年', exact: true }).click()
+  await dialog.getByRole('option', { name: '1月', exact: true }).click()
+  await expect(page).toHaveURL(/month=2026-06&day=2026-06-15/)
+  await dialog.getByRole('button', { name: '取消' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(trigger).toHaveText('2026年06月')
+  await expect(trigger).toBeFocused()
+
+  await trigger.click()
+  dialog = page.getByRole('dialog', { name: '选择月份' })
+  await expect(dialog.getByRole('option', { name: '6月', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await dialog.getByRole('button', { name: '回到本月' }).click()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(trigger).toHaveText('2026年06月')
+
+  await selectMobileCalendarMonth(page, 2027, 1)
+  await expect(page).toHaveURL(/\/calendar\?month=2027-01$/)
+  await expect(trigger).toHaveText('2027年01月')
+  await expect(page.getByText('当月费用').locator('..')).toContainText('¥0.00')
+  await expect(trigger).toBeFocused()
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe('')
+
+  await page.setViewportSize({ width: 740, height: 390 })
+  await trigger.click()
+  dialog = page.getByRole('dialog', { name: '选择月份' })
+  await page.waitForTimeout(200)
+  const [dialogBox, currentMonthBox] = await Promise.all([dialog.boundingBox(), dialog.getByRole('button', { name: '回到本月' }).boundingBox()])
+  expect(dialogBox).not.toBeNull()
+  expect(currentMonthBox).not.toBeNull()
+  expect(currentMonthBox!.y + currentMonthBox!.height).toBeLessThanOrEqual(390)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
 })
 
 test('records, edits and deletes a dated expense from the calendar', async ({ page }) => {
@@ -253,7 +324,7 @@ for (const deviceName of ['iPhone 14', 'Galaxy S9+']) {
       await page.getByLabel('发生时间').fill('2026-09-04T08:00')
       await page.getByRole('button', { name: '保存并查看记录' }).click()
       await page.getByRole('link', { name: '费用日历' }).click()
-      await page.getByLabel('费用日历月份').fill('2026-09')
+      await selectMobileCalendarMonth(page, 2026, 9)
 
       const summaryCards = page.locator('.calendar-summary > .metric')
       const summaryBoxes = await Promise.all([0, 1, 2].map(index => summaryCards.nth(index).boundingBox()))

@@ -14,6 +14,7 @@ beforeEach(async () => {
 })
 afterEach(async () => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   cleanup()
   await db.transaction('rw', db.vehicles, db.records, db.settings, async () => {
     await db.records.clear()
@@ -21,6 +22,19 @@ afterEach(async () => {
     await db.settings.clear()
   })
 })
+
+function useMobileViewportForTest() {
+  vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+    matches: query === '(max-width: 767px)',
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })))
+}
 
 it('shows all seven primary navigation items', () => {
   render(<MemoryRouter><App /></MemoryRouter>)
@@ -294,6 +308,67 @@ it('summarizes calendar days for the selected month and vehicle, then shows orde
   fireEvent.change(screen.getByLabelText('当前车辆'), { target: { value: 'all' } })
   await waitFor(() => expect(screen.getByText('当月费用').closest('.metric')).toHaveTextContent('¥81.00'))
   expect(screen.getByRole('region', { name: '当天记录' })).toHaveTextContent('日历电动车')
+})
+
+it('uses a mobile month sheet and applies its draft only after confirmation', async () => {
+  useMobileViewportForTest()
+  await db.saveVehicle({ id: 'calendar-picker', name: '月份选择车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  const base = { vehicleId: 'calendar-picker', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'calendar-picker-old', amountCents: 1200, occurredAt: '2026-08-03T08:00' })
+  await db.saveRecord({ ...base, id: 'calendar-picker-new', amountCents: 2500, occurredAt: '2027-01-04T08:00' })
+
+  render(<MemoryRouter initialEntries={['/calendar?month=2026-08&day=2026-08-03']}><App /></MemoryRouter>)
+  const trigger = await screen.findByRole('button', { name: '选择费用日历月份' })
+  expect(trigger).toHaveTextContent('2026年08月')
+  expect(screen.queryByLabelText('费用日历月份')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^本月$/ })).not.toBeInTheDocument()
+
+  fireEvent.click(trigger)
+  const dialog = await screen.findByRole('dialog', { name: '选择月份' })
+  expect(within(dialog).getByRole('option', { name: '2026年' })).toHaveAttribute('aria-selected', 'true')
+  expect(within(dialog).getByRole('option', { name: '8月' })).toHaveAttribute('aria-selected', 'true')
+  fireEvent.click(within(dialog).getByRole('option', { name: '2027年' }))
+  fireEvent.click(within(dialog).getByRole('option', { name: '1月' }))
+  expect(screen.getByText('当月费用').closest('.metric')).toHaveTextContent('¥12.00')
+
+  fireEvent.click(within(dialog).getByRole('button', { name: '确定' }))
+  await waitFor(() => expect(trigger).toHaveTextContent('2027年01月'))
+  expect(screen.getByText('当月费用').closest('.metric')).toHaveTextContent('¥25.00')
+  expect(screen.getByText('请选择一天查看费用记录。')).toBeInTheDocument()
+  expect(trigger).toHaveFocus()
+})
+
+it('cancels the mobile month sheet without changing the page and resets its draft', async () => {
+  useMobileViewportForTest()
+  vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-09-16T12:00:00').getTime())
+  await db.saveVehicle({ id: 'calendar-picker-cancel', name: '月份取消车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  render(<MemoryRouter initialEntries={['/calendar?month=2026-06']}><App /></MemoryRouter>)
+  const trigger = await screen.findByRole('button', { name: '选择费用日历月份' })
+
+  fireEvent.click(trigger)
+  let dialog = await screen.findByRole('dialog', { name: '选择月份' })
+  fireEvent.click(within(dialog).getByRole('option', { name: '2027年' }))
+  fireEvent.click(within(dialog).getByRole('option', { name: '1月' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '取消' }))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '选择月份' })).not.toBeInTheDocument())
+  expect(trigger).toHaveTextContent('2026年06月')
+  expect(trigger).toHaveFocus()
+
+  fireEvent.click(trigger)
+  dialog = await screen.findByRole('dialog', { name: '选择月份' })
+  expect(within(dialog).getByRole('option', { name: '2026年' })).toHaveAttribute('aria-selected', 'true')
+  expect(within(dialog).getByRole('option', { name: '6月' })).toHaveAttribute('aria-selected', 'true')
+  fireEvent.click(within(dialog).getByRole('button', { name: '回到本月' }))
+  expect(within(dialog).getByRole('option', { name: '9月' })).toHaveAttribute('aria-selected', 'true')
+  fireEvent.click(dialog)
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '选择月份' })).not.toBeInTheDocument())
+  expect(trigger).toHaveTextContent('2026年06月')
+
+  fireEvent.click(trigger)
+  dialog = await screen.findByRole('dialog', { name: '选择月份' })
+  fireEvent(dialog, new Event('cancel', { cancelable: true }))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '选择月份' })).not.toBeInTheDocument())
+  expect(trigger).toHaveFocus()
 })
 
 it('returns from calendar bookkeeping and updates calendar records after editing or deleting', async () => {

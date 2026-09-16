@@ -35,7 +35,6 @@ table { width: 100%; border-collapse: collapse; background: white; } th, td { te
 .calendar-toolbar { flex-wrap: nowrap; }
 .calendar-toolbar input { flex: 1 1 auto; min-width: 0; }
 .calendar-toolbar button { white-space: nowrap; }
-@media (max-width: 760px) { .calendar-return-current { display: none; } }
 @media (max-width: 760px) { .app-shell { grid-template-columns: 1fr; } aside { padding: 12px; } nav { grid-template-columns: repeat(2, 1fr); } header { padding: 12px; } section { padding: 20px; } .records-table { display: none; } .records-cards { display: grid; gap: 12px; } .records-page .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .records-filters > label, .records-filters > button { flex: 1 1 140px; min-width: 0; } .records-filters input, .records-filters select { min-width: 0; width: 100%; } }
 @media (max-width: 900px) { .metrics, .grid-two { grid-template-columns: 1fr 1fr; } }
 .energy-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -412,4 +411,51 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .record-card-chevron { position: absolute; top: 50%; right: 16px; color: #91a3ae; font-size: 28px; font-weight: 400; line-height: 1; transform: translateY(-50%); }
   .load-more-records { width: 100%; margin-top: 14px; }
   .record-detail-actions button { flex: 1 1 130px; }
+}
+
+.calendar-month-trigger { flex: 1 1 auto; min-width: 0; min-height: 44px; overflow: hidden; color: var(--ui-text); font-weight: 650; text-overflow: ellipsis; }
+.calendar-month-dialog { position: fixed; inset: auto 0 0; box-sizing: border-box; width: min(100%, 520px); max-width: none; max-height: min(82dvh, 680px); margin: auto auto 0; overflow-x: hidden; overflow-y: auto; padding: 10px max(20px, env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); border: 0; border-radius: 24px 24px 0 0; color: var(--ui-text); background: var(--ui-surface); box-shadow: 0 -14px 40px #1022352e; animation: calendar-sheet-in 180ms ease-out; }
+.calendar-month-dialog::backdrop { background: #10223573; animation: calendar-backdrop-in 180ms ease-out; }
+.calendar-month-dialog.is-closing { animation: calendar-sheet-out 180ms ease-in forwards; }
+.calendar-month-dialog.is-closing::backdrop { animation: calendar-backdrop-out 180ms ease-in forwards; }
+.calendar-month-handle { width: 42px; height: 5px; margin: 0 auto 8px; border-radius: 999px; background: #c8d5d8; }
+.calendar-month-dialog-heading { display: grid; grid-template-columns: minmax(68px, 1fr) auto minmax(68px, 1fr); align-items: center; gap: 8px; }
+.calendar-month-dialog-heading h3 { margin: 0; font-size: 19px; text-align: center; }
+.calendar-month-dialog-heading button { min-height: 44px; border-color: transparent; color: var(--ui-teal-strong); background: transparent; font-weight: 700; }
+.calendar-month-dialog-heading button:first-child { justify-self: start; }
+.calendar-month-dialog-heading .calendar-month-confirm { justify-self: end; color: #fff; border-color: var(--ui-teal); background: var(--ui-teal); }
+.calendar-month-pickers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.calendar-month-column { display: grid; min-width: 0; gap: 6px; padding: 0; text-align: center; }
+.calendar-month-column > strong { color: var(--ui-muted); font-size: 13px; }
+.calendar-month-options { height: min(34dvh, 252px); overflow-y: auto; padding: 84px 5px; border: 1px solid var(--ui-line); border-radius: 16px; background: #f8fbfb; scroll-padding-block: 84px; scroll-snap-type: y mandatory; overscroll-behavior: contain; }
+.calendar-month-options button { display: block; width: 100%; min-height: 44px; margin: 2px 0; border-color: transparent; color: var(--ui-muted); background: transparent; font-size: 16px; scroll-snap-align: center; }
+.calendar-month-options button.selected { color: var(--ui-teal-strong); border-color: #8bc9c5; background: #e8f8f6; font-size: 18px; font-weight: 750; }
+.calendar-month-options:focus-visible { outline: 3px solid #8ed9d4; outline-offset: 2px; }
+.calendar-month-more { min-height: 32px; padding: 2px 8px; border-color: transparent; color: var(--ui-teal-strong); background: transparent; font-size: 12px; }
+.calendar-month-more:disabled { visibility: hidden; }
+.calendar-month-options--months { margin-top: 38px; margin-bottom: 38px; }
+.calendar-month-current { display: block; min-height: 44px; margin: 14px auto 0; border-color: #b8d8d5; color: var(--ui-teal-strong); background: #f0faf9; font-weight: 700; }
+
+@keyframes calendar-sheet-in { from { opacity: 0; transform: translateY(32px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes calendar-sheet-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(32px); } }
+@keyframes calendar-backdrop-in { from { background: #10223500; } to { background: #10223573; } }
+@keyframes calendar-backdrop-out { from { background: #10223573; } to { background: #10223500; } }
+
+@media (max-width: 767px) {
+  .calendar-toolbar > button { min-height: 44px; }
+  .calendar-toolbar > button:first-child, .calendar-toolbar > button:last-child { flex: 0 0 auto; }
+}
+
+@media (max-height: 520px) and (max-width: 767px) {
+  .calendar-month-dialog { max-height: 100dvh; padding-top: 6px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .calendar-month-handle { display: none; }
+  .calendar-month-pickers { margin-top: 6px; }
+  .calendar-month-options { height: 104px; padding-block: 30px; scroll-padding-block: 30px; }
+  .calendar-month-more { min-height: 26px; }
+  .calendar-month-options--months { margin-block: 32px; }
+  .calendar-month-current { margin-top: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-month-dialog, .calendar-month-dialog::backdrop, .calendar-month-dialog.is-closing, .calendar-month-dialog.is-closing::backdrop { animation: none; }
 }
