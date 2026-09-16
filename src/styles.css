@@ -118,7 +118,7 @@ body { background: var(--ui-bg); color: var(--ui-text); }
 .app-shell .desktop-nav a.active { color: var(--ui-teal-strong); background: #dff4f2; }
 .app-shell main { min-width: 0; padding: 0 36px 48px; }
 .app-shell .global-header { display: flex; align-items: center; gap: 12px; min-height: 80px; border-bottom: 1px solid var(--ui-line); }
-.app-shell .global-header select { width: min(250px, 38vw); min-height: 42px; padding: 0 12px; border: 1px solid #b9dbd8; border-radius: 12px; color: var(--ui-text); background: #f5fbfb; }
+.app-shell .global-header select { width: min(250px, 38vw); min-height: 42px; padding: 0 12px; border: 1px solid #b9dbd8; border-radius: 12px; color: var(--ui-text); background: #f5fbfb; font-size: 16px; font-weight: 700; }
 .app-shell .global-header .more-return { flex: 0 0 42px; }
 .app-shell .header-add, .app-shell .header-data { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; border: 1px solid transparent; border-radius: 12px; font-weight: 750; }
 .app-shell .header-add { margin-left: auto; padding: 0 17px; color: #fff; background: var(--ui-teal); box-shadow: 0 7px 16px #087d7626; }
@@ -139,7 +139,7 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .app-shell .desktop-nav { display: none; }
   .app-shell main { padding: 0 20px calc(88px + env(safe-area-inset-bottom)); }
   .app-shell .global-header { min-height: 72px; gap: 8px; }
-  .app-shell .global-header select { flex: 1; width: auto; min-width: 0; }
+  .app-shell .global-header select { flex: 1; width: auto; min-width: 0; font-size: 17px; }
   .app-shell .header-data, .app-shell .save-indicator { display: none; }
   .app-shell .header-add { flex: 0 0 46px; margin-left: 0; padding: 0; }
   .app-shell .header-add span { display: none; }
