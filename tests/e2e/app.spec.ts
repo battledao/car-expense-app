@@ -153,6 +153,24 @@ test('lays out the expense calendar without overlap on desktop and narrow screen
 
   await expect(page.getByLabel('费用日历月份')).toBeVisible()
   await expect(page.locator('.calendar-page .toolbar')).not.toContainText('费用日历月份')
+  const currentMonth = await page.getByLabel('费用日历月份').inputValue()
+  const historicalMonth = currentMonth === '2026-08' ? '2026-07' : '2026-08'
+  const returnCurrentMonth = page.getByRole('button', { name: '本月', exact: true })
+  await expect(returnCurrentMonth).toHaveCount(0)
+  await page.getByLabel('费用日历月份').fill(historicalMonth)
+  await expect(returnCurrentMonth).toBeVisible()
+  const desktopToolbarBoxes = await Promise.all([
+    page.getByRole('button', { name: '上个月' }).boundingBox(),
+    page.getByLabel('费用日历月份').boundingBox(),
+    page.getByRole('button', { name: '下个月' }).boundingBox(),
+    returnCurrentMonth.boundingBox(),
+  ])
+  expect(desktopToolbarBoxes.every((box): box is NonNullable<typeof box> => box !== null)).toBe(true)
+  const desktopToolbarCenters = desktopToolbarBoxes.map(box => box.y + box.height / 2)
+  expect(Math.max(...desktopToolbarCenters) - Math.min(...desktopToolbarCenters)).toBeLessThanOrEqual(1)
+  await returnCurrentMonth.click()
+  await expect(page.getByLabel('费用日历月份')).toHaveValue(currentMonth)
+  await expect(returnCurrentMonth).toHaveCount(0)
   const desktopPanels = page.locator('.calendar-layout > .panel')
   const [calendarPanel, detailPanel] = await Promise.all([desktopPanels.nth(0).boundingBox(), desktopPanels.nth(1).boundingBox()])
   expect(calendarPanel).not.toBeNull()
@@ -166,6 +184,16 @@ test('lays out the expense calendar without overlap on desktop and narrow screen
   expect(firstDay!.x + firstDay!.width).toBeLessThanOrEqual(secondDay!.x)
 
   await page.setViewportSize({ width: 600, height: 900 })
+  await page.getByLabel('费用日历月份').fill(historicalMonth)
+  await expect(returnCurrentMonth).toBeHidden()
+  const mobileToolbarBoxes = await Promise.all([
+    page.getByRole('button', { name: '上个月' }).boundingBox(),
+    page.getByLabel('费用日历月份').boundingBox(),
+    page.getByRole('button', { name: '下个月' }).boundingBox(),
+  ])
+  expect(mobileToolbarBoxes.every((box): box is NonNullable<typeof box> => box !== null)).toBe(true)
+  const mobileToolbarCenters = mobileToolbarBoxes.map(box => box.y + box.height / 2)
+  expect(Math.max(...mobileToolbarCenters) - Math.min(...mobileToolbarCenters)).toBeLessThanOrEqual(1)
   const [narrowCalendar, narrowDetail] = await Promise.all([desktopPanels.nth(0).boundingBox(), desktopPanels.nth(1).boundingBox()])
   expect(narrowCalendar).not.toBeNull()
   expect(narrowDetail).not.toBeNull()

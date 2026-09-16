@@ -32,6 +32,10 @@ table { width: 100%; border-collapse: collapse; background: white; } th, td { te
 .bars { display: grid; gap: 10px; } .bars > div { display: grid; grid-template-columns: 72px 1fr 90px; align-items: center; gap: 8px; } .bars i { display: block; height: 12px; background: #3a8a7c; border-radius: 4px; }
 .big-number { font-size: 24px; font-weight: 700; } .vehicle-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; } .vehicle-list .panel { margin: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+.calendar-toolbar { flex-wrap: nowrap; }
+.calendar-toolbar input { flex: 1 1 auto; min-width: 0; }
+.calendar-toolbar button { white-space: nowrap; }
+@media (max-width: 760px) { .calendar-return-current { display: none; } }
 @media (max-width: 760px) { .app-shell { grid-template-columns: 1fr; } aside { padding: 12px; } nav { grid-template-columns: repeat(2, 1fr); } header { padding: 12px; } section { padding: 20px; } .records-table { display: none; } .records-cards { display: grid; gap: 12px; } .records-page .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .records-filters > label, .records-filters > button { flex: 1 1 140px; min-width: 0; } .records-filters input, .records-filters select { min-width: 0; width: 100%; } }
 @media (max-width: 900px) { .metrics, .grid-two { grid-template-columns: 1fr 1fr; } }
 .energy-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
