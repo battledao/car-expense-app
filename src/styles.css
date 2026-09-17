@@ -145,7 +145,7 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .app-shell .header-add span { display: none; }
   .app-shell .mobile-nav { position: fixed; z-index: 20; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); left: 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 8px 5px; border: 1px solid #e3eaed; border-radius: 24px; background: #fffffff2; box-shadow: 0 10px 30px #15314a1c; backdrop-filter: blur(18px); }
   .app-shell .mobile-nav a { display: grid; justify-items: center; gap: 4px; min-height: 53px; padding: 5px 2px 2px; color: #7a8493; font-size: 11px; font-weight: 650; text-decoration: none; }
-  .app-shell .mobile-nav a.active { color: var(--ui-teal); }
+  .app-shell .mobile-nav a.active { color: var(--ui-teal-strong); background: #dff4f2; }
   .app-shell .mobile-nav a svg { color: currentColor; }
   .app-shell .is-focus main { padding-right: 16px; padding-left: 16px; }
   .app-shell .record-page { padding-top: 18px; }
