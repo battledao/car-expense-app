@@ -453,6 +453,9 @@ it('shows month-aware dashboard metrics for one vehicle and active vehicle count
 
   const dashboardMonth = await screen.findByLabelText('首页月份')
   fireEvent.change(dashboardMonth, { target: { value: '2026-08' } })
+  const dashboardHeading = screen.getByRole('heading', { name: '首页总览' }).closest('.dashboard-heading') as HTMLElement
+  expect(within(dashboardHeading).queryByRole('link', { name: '记一笔' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '记一笔' })).toBeInTheDocument()
   expect(screen.getByLabelText('当前车辆')).toHaveDisplayValue('首页测试车')
   expect(screen.queryByText('首页测试车 · 2026-08')).not.toBeInTheDocument()
   expect(screen.getByText('本月费用').closest('.metric')).toHaveTextContent('¥70.00')
