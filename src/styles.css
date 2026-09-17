@@ -26,7 +26,7 @@ section h2 { margin-top: 0; }
 .field-error { color: #a41d2d; font-size: 13px; } [aria-invalid="true"] { border-color: #a41d2d; } .record-actions { display: flex; flex-wrap: wrap; gap: 10px; } .save-status { color: #174f47; margin: 0; }
 label { display: grid; gap: 6px; font-size: 14px; } input, select, textarea, button { padding: 8px 10px; border: 1px solid #bdc9c5; border-radius: 7px; background: white; } textarea { min-height: 76px; resize: vertical; } button { cursor: pointer; } button:hover { background: #edf5f2; } .check { display: flex; align-items: center; margin-top: 24px; } .check input { width: auto; }
 .error { color: #a41d2d; margin: 0; } .filters, .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0; }
-table { width: 100%; border-collapse: collapse; background: white; } th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e3e8e6; } td button { margin-right: 5px; padding: 5px 7px; }.records-cards { display: none; }.record-card { border: 1px solid #d8e2df; border-radius: 10px; background: white; padding: 14px; }.record-card p { margin: 8px 0; }.record-card-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }.record-view, .record-card-view { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; text-align: left; }.record-view:hover, .record-card-view:hover { color: #174f47; background: transparent; }.record-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }.record-card-actions button { min-width: 44px; min-height: 44px; }.record-highlight-note { margin: 12px 0; padding: 10px 12px; border-left: 4px solid #8b6d28; background: #fff6d9; color: #5d4715; }
+table { width: 100%; border-collapse: collapse; background: white; } th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e3e8e6; } td button { margin-right: 5px; padding: 5px 7px; }.records-mobile-groups { display: none; }.record-view { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; text-align: left; }.record-view:hover { color: #174f47; background: transparent; }.record-highlight-note { margin: 12px 0; padding: 10px 12px; border-left: 4px solid #8b6d28; background: #fff6d9; color: #5d4715; }
 .drawer { position: fixed; z-index: 2; top: 0; right: 0; width: min(680px, 95vw); height: 100vh; overflow: auto; padding: 24px; background: white; box-shadow: -8px 0 24px #0003; }
 .calendar-page { max-width: 1280px; } .calendar-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; } .calendar-heading h2 { margin-bottom: 6px; } .calendar-empty { margin: 16px 0; } .calendar-empty a { margin-left: 8px; } .calendar-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; gap: 16px; } .calendar-layout .panel { min-width: 0; margin: 0; } .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; width: 100%; } .calendar > strong { min-width: 0; text-align: center; } .calendar-day { display: grid; align-content: space-between; gap: 3px; min-width: 0; min-height: 96px; overflow: hidden; padding: 8px; text-align: left; } .calendar-day > strong { overflow: hidden; color: #174f47; font-size: 13px; text-align: left; text-overflow: ellipsis; white-space: nowrap; } .calendar-day > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .calendar-day.today { border-color: #8b6d28; } .calendar-day.selected { outline: 3px solid #28685e; outline-offset: -3px; } .calendar-records .record-row { padding: 4px 0; }
 .bars { display: grid; gap: 10px; } .bars > div { display: grid; grid-template-columns: 72px 1fr 90px; align-items: center; gap: 8px; } .bars i { display: block; height: 12px; background: #3a8a7c; border-radius: 4px; }
@@ -35,7 +35,7 @@ table { width: 100%; border-collapse: collapse; background: white; } th, td { te
 .calendar-toolbar { flex-wrap: nowrap; }
 .calendar-toolbar input { flex: 1 1 auto; min-width: 0; }
 .calendar-toolbar button { white-space: nowrap; }
-@media (max-width: 760px) { .app-shell { grid-template-columns: 1fr; } aside { padding: 12px; } nav { grid-template-columns: repeat(2, 1fr); } header { padding: 12px; } section { padding: 20px; } .records-table { display: none; } .records-cards { display: grid; gap: 12px; } .records-page .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .records-filters > label, .records-filters > button { flex: 1 1 140px; min-width: 0; } .records-filters input, .records-filters select { min-width: 0; width: 100%; } }
+@media (max-width: 760px) { .app-shell { grid-template-columns: 1fr; } aside { padding: 12px; } nav { grid-template-columns: repeat(2, 1fr); } header { padding: 12px; } section { padding: 20px; } .records-page .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .records-filters > label, .records-filters > button { flex: 1 1 140px; min-width: 0; } .records-filters input, .records-filters select { min-width: 0; width: 100%; } }
 @media (max-width: 900px) { .metrics, .grid-two { grid-template-columns: 1fr 1fr; } }
 .energy-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .energy-heading-main { display: flex; align-items: flex-start; gap: 12px; }
@@ -389,7 +389,30 @@ body { background: var(--ui-bg); color: var(--ui-text); }
 
 @media (max-width: 767px) {
   .records-table { display: none; }
-  .records-cards { display: grid; gap: 12px; }
+  .records-mobile-groups { display: grid; gap: 22px; margin: 0; padding: 0; }
+  .record-date-group { display: grid; gap: 10px; margin: 0; padding: 0; }
+  .record-date-heading { display: flex; min-height: 0; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 0 4px; border: 0; background: transparent; }
+  .record-date-heading h3 { min-width: 0; margin: 0; color: var(--ui-text); font-size: 17px; line-height: 1.35; }
+  .record-date-total { flex: 0 0 auto; padding: 6px 11px; border-radius: 999px; color: var(--ui-teal-strong); background: #e7f5ed; font-size: 14px; line-height: 1.25; white-space: nowrap; }
+  .record-date-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .record-mobile-card { min-width: 0; margin: 0; padding: 0; }
+  .app-shell button.record-mobile-view { display: grid; grid-template-columns: 44px minmax(0, 1fr) max-content; width: 100%; min-height: 84px; align-items: center; gap: 12px; padding: 13px 16px; border: 1px solid var(--ui-line); border-radius: 18px; color: var(--ui-text); background: #fff; box-shadow: 0 8px 22px #15314a0d; font-weight: 400; text-align: left; }
+  .record-mobile-view:hover { color: var(--ui-text); background: #f8fcfb; }
+  .record-mobile-view:active { background: #e8f6f4; }
+  .record-mobile-view:focus-visible { position: relative; z-index: 2; outline: 3px solid #55a9e5; outline-offset: -3px; }
+  .record-mobile-icon { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 13px; color: #21766d; background: #e3f5f2; }
+  .record-mobile-icon--charge, .record-mobile-icon--parking, .record-mobile-icon--toll { color: #286fb2; background: #e8f2fc; }
+  .record-mobile-icon--wash { color: #147b93; background: #e3f6fa; }
+  .record-mobile-icon--maintenance, .record-mobile-icon--repair { color: #9a5b16; background: #fff1dc; }
+  .record-mobile-icon--insurance, .record-mobile-icon--inspection { color: #7157a3; background: #f0eafb; }
+  .record-mobile-icon--fine { color: #a3434e; background: #fbeaec; }
+  .record-mobile-icon--other { color: #66737c; background: #eef1f3; }
+  .record-mobile-main, .record-mobile-side { display: grid; min-width: 0; gap: 5px; }
+  .record-mobile-category { display: -webkit-box; overflow: hidden; color: var(--ui-text); font-size: 16px; line-height: 1.3; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .record-mobile-meta { overflow: hidden; color: var(--ui-muted); font-size: 12px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+  .record-mobile-side { justify-items: end; text-align: right; }
+  .record-mobile-amount { color: var(--ui-teal-strong); font-size: clamp(15px, 4.2vw, 17px); line-height: 1.25; white-space: nowrap; }
+  .record-mobile-datetime { color: var(--ui-muted); font-size: 11px; line-height: 1.35; white-space: nowrap; }
   .records-page { padding-top: 21px; }
   .records-heading h2 { font-size: 25px; }
   .records-overview { margin-top: 16px; padding: 17px 18px; }
@@ -400,14 +423,6 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .record-filter-drawer .field { grid-template-columns: 1fr; gap: 12px; }
   .record-filter-actions { position: sticky; bottom: -84px; padding-top: 12px; padding-bottom: 4px; background: linear-gradient(180deg, #ffffffd9, #fff 28%); }
   .record-filter-actions button { flex: 1 1 140px; }
-  .record-card { padding: 0; overflow: hidden; border-color: var(--ui-line); border-radius: 16px; box-shadow: var(--ui-shadow); }
-  .record-card-view { position: relative; display: grid; gap: 8px; width: 100%; min-height: 102px; padding: 16px 44px 16px 16px; color: var(--ui-text); font-weight: 400; }
-  .record-card-view:hover { color: var(--ui-text); background: #f6fbfb; }
-  .record-card-heading { width: 100%; align-items: baseline; }
-  .record-card-heading strong:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .record-card-heading strong:last-child { flex: 0 0 auto; color: var(--ui-teal-strong); font-size: 17px; }
-  .record-card-meta { overflow: hidden; color: var(--ui-muted); font-size: 13px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
-  .record-card-chevron { position: absolute; top: 50%; right: 16px; color: #91a3ae; font-size: 28px; font-weight: 400; line-height: 1; transform: translateY(-50%); }
   .load-more-records { width: 100%; margin-top: 14px; }
   .record-detail-actions button { flex: 1 1 130px; }
 }

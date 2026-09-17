@@ -22,7 +22,7 @@ test('uses a semantic table on desktop detailed records', async ({ page }) => {
   await createRecord(page)
 
   await expect(page.locator('.records-table')).toBeVisible()
-  await expect(page.locator('.records-cards')).toBeHidden()
+  await expect(page.locator('.records-mobile-groups')).toBeHidden()
   const table = page.getByRole('table', { name: '详细记录列表' })
   await expect(table).toContainText('¥12.00')
   await expect(table.getByRole('columnheader', { name: '操作' })).toHaveCount(0)
@@ -82,14 +82,18 @@ test('lets people clear a no-result filter, retain a new-record entry, and retur
   await expect(page).not.toHaveURL(/category=wash/)
   await expect(page.getByRole('table', { name: '详细记录列表' })).toContainText('¥12.00')
 })
-test('switches to record cards at the 767px mobile-shell breakpoint', async ({ page }) => {
+test('switches between the grouped mobile cards and desktop table at the 767px boundary', async ({ page }) => {
   await page.setViewportSize({ width: 767, height: 900 })
   await createRecord(page, '断点验收车')
 
   await expect(page.locator('.mobile-nav')).toBeVisible()
-  await expect(page.locator('.records-cards')).toBeVisible()
+  await expect(page.locator('.records-mobile-groups')).toBeVisible()
   await expect(page.locator('.records-table')).toBeHidden()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+
+  await page.setViewportSize({ width: 768, height: 900 })
+  await expect(page.locator('.records-mobile-groups')).toBeHidden()
+  await expect(page.locator('.records-table')).toBeVisible()
 })
 for (const deviceName of ['iPhone 14', 'Galaxy S9+']) {
   const { defaultBrowserType: _defaultBrowserType, ...device } = devices[deviceName]
@@ -97,15 +101,21 @@ for (const deviceName of ['iPhone 14', 'Galaxy S9+']) {
   test.describe('mobile detailed-record acceptance: ' + deviceName, () => {
     test.use(device)
 
-    test('shows readable detail-entry cards without inline actions and no horizontal overflow', async ({ page }) => {
+    test('shows readable compact rows without inline actions and no horizontal overflow', async ({ page }) => {
       await createRecord(page, deviceName + ' 详细记录车')
 
-      await expect(page.locator('.records-cards')).toBeVisible()
+      await expect(page.locator('.records-mobile-groups')).toBeVisible()
       await expect(page.locator('.records-table')).toBeHidden()
-      const card = page.locator('.record-card').first()
-      await expect(card).toContainText('测试停车场')
-      await expect(card.locator('.record-card-actions button')).toHaveCount(0)
-      const view = card.getByRole('button', { name: /查看2026年9月4日停车记录/ })
+      const row = page.locator('.record-mobile-card').first()
+      await expect(row).toContainText('停车')
+      await expect(row).not.toContainText('测试停车场')
+      await expect(row.locator('.record-mobile-datetime')).toHaveText('08:00')
+      await expect(page.getByRole('heading', { name: '2026年9月4日' })).toBeVisible()
+      await expect(page.getByLabel('2026年9月4日合计¥12.00')).toHaveText('¥12.00')
+      await expect(row.getByRole('button', { name: /编辑|删除|复制/ })).toHaveCount(0)
+      await expect(row.locator('.record-mobile-icon svg')).toHaveAttribute('aria-hidden', 'true')
+      await expect(row.locator('.record-card-chevron')).toHaveCount(0)
+      const view = row.getByRole('button', { name: /查看2026年9月4日 08:00 停车 ¥12\.00/ })
       expect((await view.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
       await view.click()
       const detail = page.getByRole('dialog', { name: '记录详情' })
@@ -117,3 +127,105 @@ for (const deviceName of ['iPhone 14', 'Galaxy S9+']) {
     })
   })
 }
+
+test('keeps long mobile record content readable from 320px through 430px', async ({ page }) => {
+  await createVehicle(page, '一辆名称非常长但仍然需要安全显示的家庭用车')
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.getByLabel('金额（元）').fill('1234567.89')
+  await page.getByLabel('发生时间').fill('2026-09-04T08:05')
+  await page.getByLabel('停车场或地点').fill('名称非常长的国际机场地下停车场东区入口附近')
+  await page.getByRole('button', { name: '保存并查看记录' }).click()
+
+  for (const width of [320, 375, 390, 414, 430]) {
+    await page.setViewportSize({ width, height: 900 })
+    const groups = page.locator('.records-mobile-groups')
+    const row = page.locator('.record-mobile-card').first()
+    await expect(groups).toBeVisible()
+    await expect(row.locator('.record-mobile-amount')).toHaveText('¥1234567.89')
+    await expect(row.locator('.record-mobile-datetime')).toHaveText('08:05')
+    const boxes = await row.evaluate(element => {
+      const main = element.querySelector('.record-mobile-main')!.getBoundingClientRect()
+      const side = element.querySelector('.record-mobile-side')!.getBoundingClientRect()
+      return { mainRight: main.right, sideLeft: side.left, rowWidth: element.getBoundingClientRect().width }
+    })
+    expect(boxes.mainRight).toBeLessThanOrEqual(boxes.sideLeft)
+    expect(boxes.rowWidth).toBeLessThanOrEqual(width)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+  }
+})
+
+test('preserves mobile detail focus and updates the current result after edit and delete', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await createRecord(page, '交互闭环验收车')
+  const row = page.locator('.record-mobile-view').first()
+
+  await row.focus()
+  await row.press('Enter')
+  let detail = page.getByRole('dialog', { name: '记录详情' })
+  await expect(detail).toBeVisible()
+  await detail.getByRole('button', { name: '关闭' }).click()
+  await expect(row).toBeFocused()
+
+  await row.press('Space')
+  detail = page.getByRole('dialog', { name: '记录详情' })
+  await detail.getByRole('button', { name: '编辑记录' }).click()
+  const edit = page.getByRole('dialog', { name: '编辑记录' })
+  await edit.getByLabel('金额（元）').fill('15')
+  await edit.getByRole('button', { name: '保存更改' }).click()
+  await expect(page.getByText('记录已更新。', { exact: true })).toBeVisible()
+  await expect(page.locator('.record-mobile-amount')).toHaveText('¥15.00')
+  await expect(page.getByLabel('记录结果概览')).toContainText('1 笔 · ¥15.00')
+
+  const updatedRow = page.locator('.record-mobile-view').first()
+  await updatedRow.click()
+  detail = page.getByRole('dialog', { name: '记录详情' })
+  page.once('dialog', dialog => dialog.accept())
+  await detail.getByRole('button', { name: '删除记录' }).click()
+  await expect(page.getByLabel('记录结果概览')).toContainText('0 笔 · ¥0.00')
+  await expect(page.getByRole('heading', { name: '详细记录' })).toBeFocused()
+})
+
+test('keeps grouped cards usable in a narrow mobile landscape viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await createRecord(page, '横屏验收车')
+  await page.setViewportSize({ width: 740, height: 390 })
+
+  await expect(page.locator('.records-mobile-groups')).toBeVisible()
+  await expect(page.locator('.records-table')).toBeHidden()
+  await expect(page.locator('.record-mobile-view').first()).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+})
+
+test('uses separate date groups and independent cards while remaining readable with enlarged mobile text', async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 900 })
+  await createRecord(page, '分隔线验收车')
+  await page.locator('main > header').getByRole('button', { name: '记一笔', exact: true }).click()
+  await page.getByLabel('金额（元）').fill('5')
+  await page.getByLabel('发生时间').fill('2026-09-03T07:30')
+  await page.getByLabel('停车场或地点').fill('第二停车场')
+  await page.getByRole('button', { name: '保存并查看记录' }).click()
+
+  const groups = page.locator('.record-date-group')
+  const rows = page.locator('.record-mobile-card')
+  await expect(groups).toHaveCount(2)
+  await expect(rows).toHaveCount(2)
+  await expect(page.getByRole('heading', { name: '2026年9月4日' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '2026年9月3日' })).toBeVisible()
+  const cardVisual = await rows.first().locator('.record-mobile-view').evaluate(element => {
+    const style = getComputedStyle(element)
+    return { background: style.backgroundColor, radius: Number.parseFloat(style.borderRadius), shadow: style.boxShadow }
+  })
+  expect(cardVisual.background).toBe('rgb(255, 255, 255)')
+  expect(cardVisual.radius).toBeGreaterThanOrEqual(16)
+  expect(cardVisual.shadow).not.toBe('none')
+
+  await page.addStyleTag({ content: '.record-mobile-category,.record-mobile-amount,.record-mobile-meta,.record-mobile-datetime{font-size:200%!important}' })
+  const firstRow = rows.first()
+  const boxes = await firstRow.evaluate(element => {
+    const main = element.querySelector('.record-mobile-main')!.getBoundingClientRect()
+    const side = element.querySelector('.record-mobile-side')!.getBoundingClientRect()
+    return { mainRight: main.right, sideLeft: side.left }
+  })
+  expect(boxes.mainRight).toBeLessThanOrEqual(boxes.sideLeft)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+})

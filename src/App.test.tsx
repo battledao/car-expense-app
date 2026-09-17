@@ -677,6 +677,84 @@ it('opens complete detailed-record information and restores focus after closing'
   await waitFor(() => expect(view).toHaveFocus())
 })
 
+it('groups mobile records by date, labels today, and keeps selected-vehicle cards concise', async () => {
+  await db.saveVehicle({ id: 'mobile-fields-car', name: '不应重复的车辆', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+  await db.saveRecord({ id: 'mobile-fields-today', vehicleId: 'mobile-fields-car', category: 'wash', amountCents: 1000, occurredAt: `${today}T12:30`, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  await db.saveRecord({ id: 'mobile-fields-record', vehicleId: 'mobile-fields-car', category: 'parking', amountCents: 1234, occurredAt: '2026-09-04T08:05', merchantOrLocation: '测试停车场', notes: '只在详情显示', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter initialEntries={['/records?vehicle=mobile-fields-car']}><App /></MemoryRouter>)
+
+  const groups = await screen.findByLabelText('手机详细记录分组')
+  expect(within(groups).getByRole('heading', { name: '今天' })).toBeInTheDocument()
+  expect(within(groups).getByRole('heading', { name: '2026年9月4日' })).toBeInTheDocument()
+  const datedList = within(groups).getByRole('list', { name: '2026年9月4日记录' })
+  expect(within(datedList).getByText('停车')).toBeInTheDocument()
+  expect(within(datedList).getByText('08:05')).toBeInTheDocument()
+  expect(within(datedList).queryByText('测试停车场')).not.toBeInTheDocument()
+  expect(within(groups).queryByText('不应重复的车辆')).not.toBeInTheDocument()
+  expect(within(groups).queryByText('只在详情显示')).not.toBeInTheDocument()
+})
+
+it('shows only the vehicle as auxiliary information in all-vehicle mobile cards', async () => {
+  await db.saveVehicle({ id: 'all-fields-first', name: '第一辆车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveVehicle({ id: 'all-fields-second', name: '第二辆车', energyType: 'fuel', initialMileage: 0, isDefault: false })
+  await db.saveRecord({ id: 'all-fields-with-merchant', vehicleId: 'all-fields-first', category: 'wash', amountCents: 2000, occurredAt: '2026-09-03T10:20', merchantOrLocation: '精洗中心', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  await db.saveRecord({ id: 'all-fields-without-merchant', vehicleId: 'all-fields-second', category: 'fine', amountCents: 5000, occurredAt: '2026-09-02T09:10', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter initialEntries={['/records']}><App /></MemoryRouter>)
+  fireEvent.change(await screen.findByLabelText('当前车辆'), { target: { value: 'all' } })
+
+  const groups = await screen.findByLabelText('手机详细记录分组')
+  await waitFor(() => expect(within(groups).getByText('第一辆车')).toBeInTheDocument())
+  expect(within(groups).getByText('第二辆车')).toBeInTheDocument()
+  expect(within(groups).queryByText('精洗中心')).not.toBeInTheDocument()
+})
+
+it('uses semantic date groups with independent full-card detail buttons', async () => {
+  await db.saveVehicle({ id: 'mobile-list-car', name: '列表语义车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveRecord({ id: 'mobile-list-record', vehicleId: 'mobile-list-car', category: 'parking', amountCents: 1200, occurredAt: '2026-09-04T08:00', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter initialEntries={['/records?vehicle=mobile-list-car']}><App /></MemoryRouter>)
+
+  const groups = await screen.findByLabelText('手机详细记录分组')
+  const list = within(groups).getByRole('list', { name: '2026年9月4日记录' })
+  expect(list.tagName).toBe('UL')
+  expect(within(list).getAllByRole('listitem')).toHaveLength(1)
+  expect(list.querySelector('.record-mobile-icon svg')).toHaveAttribute('aria-hidden', 'true')
+  expect(list.querySelector('.record-card-chevron')).not.toBeInTheDocument()
+  const rowButton = within(list).getByRole('button', { name: /查看2026年9月4日 08:00 停车 ¥12\.00记录/ })
+  fireEvent.click(rowButton)
+  expect(await screen.findByRole('dialog', { name: '记录详情' })).toBeInTheDocument()
+})
+
+it('calculates each mobile date total from the complete filtered result before loading more', async () => {
+  await db.saveVehicle({ id: 'daily-total-car', name: '每日合计车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  const base = { vehicleId: 'daily-total-car', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  for (let index = 0; index < 12; index += 1) await db.saveRecord({ ...base, id: `daily-total-${index}`, amountCents: 100, occurredAt: `2026-09-04T${String(23 - index).padStart(2, '0')}:00` })
+  render(<MemoryRouter initialEntries={['/records?vehicle=daily-total-car']}><App /></MemoryRouter>)
+
+  const group = await screen.findByRole('region', { name: '2026年9月4日' })
+  expect(within(group).getByLabelText('2026年9月4日合计¥12.00')).toHaveTextContent('¥12.00')
+  expect(within(group).getAllByRole('listitem')).toHaveLength(10)
+  fireEvent.click(screen.getByRole('button', { name: '加载更多记录' }))
+  const expandedGroup = await screen.findByRole('region', { name: '2026年9月4日' })
+  expect(within(expandedGroup).getAllByRole('listitem')).toHaveLength(12)
+  expect(within(expandedGroup).getByLabelText('2026年9月4日合计¥12.00')).toHaveTextContent('¥12.00')
+})
+
+it('keeps mobile date groups and records in the active amount-sort order', async () => {
+  await db.saveVehicle({ id: 'group-sort-car', name: '分组排序车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  const base = { vehicleId: 'group-sort-car', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'group-sort-low', amountCents: 100, occurredAt: '2026-09-04T08:00' })
+  await db.saveRecord({ ...base, id: 'group-sort-high', amountCents: 300, occurredAt: '2026-09-03T08:00' })
+  await db.saveRecord({ ...base, id: 'group-sort-middle', amountCents: 200, occurredAt: '2026-09-04T09:00' })
+  render(<MemoryRouter initialEntries={['/records?vehicle=group-sort-car&sort=amount-desc']}><App /></MemoryRouter>)
+
+  const groups = await screen.findByLabelText('手机详细记录分组')
+  expect(Array.from(groups.querySelectorAll('.record-date-heading h3')).map(heading => heading.textContent)).toEqual(['2026年9月3日', '2026年9月4日'])
+  const septemberFourth = within(groups).getByRole('list', { name: '2026年9月4日记录' })
+  expect(within(septemberFourth).getAllByRole('listitem').map(item => item.textContent)).toEqual([expect.stringContaining('¥2.00'), expect.stringContaining('¥1.00')])
+  expect(within(groups).getByLabelText('2026年9月4日合计¥3.00')).toBeInTheDocument()
+})
+
 it('edits from detail and handles detailed-record deletion failure without losing list state', async () => {
   await db.saveVehicle({ id: 'manage-car', name: '管理测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   const base = { vehicleId: 'manage-car', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
@@ -755,7 +833,7 @@ it('reveals and temporarily highlights a requested record beyond the first resul
   const target = table.querySelector('[data-record-id="highlight-target"]')
   expect(target).not.toBeNull()
   expect(target).toHaveClass('record-highlighted')
-  expect(screen.getByLabelText('详细记录卡片列表').querySelector('[data-record-id="highlight-target"]')).toHaveClass('record-highlighted')
+  expect(screen.getByLabelText('手机详细记录分组').querySelector('[data-record-id="highlight-target"]')).toHaveClass('record-highlighted')
   expect(screen.getByText('已显示 31 / 共 31 条')).toBeInTheDocument()
   expect(target).toHaveTextContent('¥25.00')
 })
