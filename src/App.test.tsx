@@ -736,7 +736,7 @@ it('calculates each mobile date total from the complete filtered result before l
   expect(within(group).getAllByRole('listitem')).toHaveLength(10)
   fireEvent.click(screen.getByRole('button', { name: '加载更多记录' }))
   const expandedGroup = await screen.findByRole('region', { name: '2026年9月4日' })
-  expect(within(expandedGroup).getAllByRole('listitem')).toHaveLength(12)
+  await waitFor(() => expect(within(expandedGroup).getAllByRole('listitem')).toHaveLength(12))
   expect(within(expandedGroup).getByLabelText('2026年9月4日合计¥12.00')).toHaveTextContent('¥12.00')
 })
 
@@ -873,13 +873,153 @@ it('opens a recent record detail and provides an edit entry from the dashboard',
   await db.saveRecord({ id: 'recent', vehicleId: 'v1', category: 'parking', amountCents: 1200, occurredAt: '2026-08-20T10:00', merchantOrLocation: '机场停车场', notes: '出差', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
   render(<MemoryRouter><App /></MemoryRouter>)
 
-  fireEvent.click(await screen.findByRole('button', { name: /查看记录：停车/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /查看记录：2026年8月20日 10:00 停车/ }))
   const detail = screen.getByRole('dialog', { name: '记录详情' })
   expect(detail).toHaveTextContent('机场停车场')
   expect(detail).toHaveTextContent('¥12.00')
   fireEvent.click(within(detail).getByRole('button', { name: '编辑记录' }))
   expect(screen.getByRole('dialog', { name: '编辑记录' })).toBeInTheDocument()
   expect(screen.getByLabelText('金额（元）')).toHaveValue(12)
+})
+
+it('shows the latest five dashboard records independently from the selected month with stable ordering', async () => {
+  await db.saveVehicle({ id: 'recent-primary', name: '最近记录主车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveVehicle({ id: 'recent-other', name: '其他车辆', energyType: 'electric', initialMileage: 0 })
+  const base = { vehicleId: 'recent-primary', excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'tie-b', category: 'wash', amountCents: 602, occurredAt: '2026-09-12T12:00' })
+  await db.saveRecord({ ...base, id: 'tie-a', category: 'parking', amountCents: 601, occurredAt: '2026-09-12T12:00' })
+  for (let index = 5; index >= 1; index -= 1) await db.saveRecord({ ...base, id: `recent-${index}`, category: 'maintenance', amountCents: index * 100, occurredAt: `2026-09-${String(index).padStart(2, '0')}T0${index}:00` })
+  await db.saveRecord({ ...base, id: 'old-month', category: 'fine', amountCents: 999, occurredAt: '2026-08-31T23:59' })
+  await db.saveRecord({ id: 'newest-other-car', vehicleId: 'recent-other', category: 'charge', amountCents: 99999, occurredAt: '2026-09-30T23:59', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+
+  render(<MemoryRouter><App /></MemoryRouter>)
+  const panel = (await screen.findByRole('heading', { name: '最近记录' })).closest('section')!
+  const list = within(panel).getByRole('list', { name: '最近记录列表' })
+  const rows = within(list).getAllByRole('button')
+
+  expect(rows).toHaveLength(5)
+  expect(rows.map(row => row.textContent)).toEqual([
+    expect.stringContaining('停车'),
+    expect.stringContaining('洗车'),
+    expect.stringContaining('保养'),
+    expect.stringContaining('保养'),
+    expect.stringContaining('保养'),
+  ])
+  expect(panel).not.toHaveTextContent('其他车辆')
+  expect(within(panel).getByRole('link', { name: /查看全部/ })).toHaveAttribute('href', '/records?vehicle=recent-primary')
+
+  fireEvent.change(screen.getByLabelText('首页月份'), { target: { value: '2026-01' } })
+  expect(within(list).getAllByRole('button').map(row => row.textContent)).toEqual(rows.map(row => row.textContent))
+})
+
+it('keeps vehicle context only in all-vehicle dashboard recent records and opens all records without extra filters', async () => {
+  await db.saveVehicle({ id: 'recent-all-first', name: '家庭车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveVehicle({ id: 'recent-all-second', name: '周末超长车辆名称', energyType: 'electric', initialMileage: 0 })
+  await db.saveRecord({ id: 'recent-all-a', vehicleId: 'recent-all-first', category: 'parking', amountCents: 1200, occurredAt: '2026-09-10T08:05', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  await db.saveRecord({ id: 'recent-all-b', vehicleId: 'recent-all-second', category: 'toll', amountCents: 123456789, occurredAt: '2026-09-11T21:51', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter><App /></MemoryRouter>)
+
+  await screen.findByRole('heading', { name: '最近记录' })
+  fireEvent.change(await screen.findByLabelText('当前车辆'), { target: { value: 'all' } })
+  await waitFor(() => expect(screen.getByLabelText('当前车辆')).toHaveValue('all'))
+  const panel = screen.getByRole('heading', { name: '最近记录' }).closest('section')!
+  await waitFor(() => expect(within(panel).getByText('周末超长车辆名称')).toBeInTheDocument())
+  expect(within(panel).getByText('家庭车')).toBeInTheDocument()
+  expect(within(panel).getByRole('link', { name: /查看全部/ })).toHaveAttribute('href', '/records')
+})
+
+it('renders compact dashboard recent-record rows without leaking detail-only fields', async () => {
+  await db.saveVehicle({ id: 'recent-layout', name: '跨城通勤超长车辆名称', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveRecord({ id: 'recent-layout-record', vehicleId: 'recent-layout', category: 'toll', amountCents: 123456789, occurredAt: '2026-09-10T21:51', mileage: 8888, merchantOrLocation: '详情页才显示的收费站', notes: '详情页才显示的备注', excludedFromEnergy: false, createdAt: '', updatedAt: '' })
+  render(<MemoryRouter><App /></MemoryRouter>)
+
+  await screen.findByRole('heading', { name: '最近记录' })
+  fireEvent.change(screen.getByLabelText('当前车辆'), { target: { value: 'all' } })
+  await waitFor(() => expect(screen.getByLabelText('当前车辆')).toHaveValue('all'))
+  const panel = screen.getByRole('heading', { name: '最近记录' }).closest('section')!
+  const row = within(panel).getByRole('button', { name: /查看记录：2026年9月10日 21:51 高速及路桥费 ¥1234567\.89 跨城通勤超长车辆名称/ })
+
+  expect(row).toHaveTextContent('高速及路桥费')
+  expect(row).toHaveTextContent('跨城通勤超长车辆名称')
+  expect(row).toHaveTextContent('¥1234567.89')
+  expect(row).toHaveTextContent('09-10 21:51')
+  expect(row).not.toHaveTextContent('详情页才显示的收费站')
+  expect(row).not.toHaveTextContent('详情页才显示的备注')
+  expect(row).not.toHaveTextContent('8888')
+  expect(row.querySelectorAll('svg')).toHaveLength(1)
+  expect(row.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  expect(within(row).queryByRole('button', { name: /编辑|复制|删除/ })).not.toBeInTheDocument()
+})
+
+it('opens complete dashboard record details and restores focus after closing', async () => {
+  await db.saveVehicle({ id: 'dashboard-detail-car', name: '首页详情车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  await db.saveRecord({ id: 'dashboard-detail-record', vehicleId: 'dashboard-detail-car', category: 'fuel', amountCents: 3560, occurredAt: '2026-09-10T21:51', mileage: 12345, merchantOrLocation: '首页测试加油站', notes: '首页完整字段', fuelLiters: 5.5, fuelGrade: '95号', unitPriceCents: 647, isFullFuel: true, excludedFromEnergy: false, createdAt: '2026-09-10T21:00:00.000Z', updatedAt: '2026-09-10T21:51:00.000Z' })
+  render(<MemoryRouter><App /></MemoryRouter>)
+
+  const row = await screen.findByRole('button', { name: /查看记录：2026年9月10日 21:51 加油 ¥35\.60/ })
+  fireEvent.click(row)
+  const detail = screen.getByRole('dialog', { name: '记录详情' })
+  expect(detail).toHaveTextContent('首页测试加油站')
+  expect(detail).toHaveTextContent('首页完整字段')
+  expect(detail).toHaveTextContent('12345 km')
+  expect(detail).toHaveTextContent('5.50 L')
+  expect(detail).toHaveTextContent('95号')
+  expect(detail).toHaveTextContent('¥6.47/L')
+  expect(detail).toHaveTextContent('已加满')
+  expect(within(detail).getByRole('button', { name: '编辑记录' })).toBeInTheDocument()
+  expect(within(detail).getByRole('button', { name: '复制为新记录' })).toBeInTheDocument()
+  expect(within(detail).getByRole('button', { name: '删除记录' })).toBeInTheDocument()
+  await waitFor(() => expect(within(detail).getByRole('heading', { name: '记录详情' })).toHaveFocus())
+
+  fireEvent.click(within(detail).getByRole('button', { name: '关闭' }))
+  await waitFor(() => expect(row).toHaveFocus())
+})
+
+it('focuses the next available dashboard record after deleting from details', async () => {
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  await db.saveVehicle({ id: 'dashboard-delete-car', name: '首页删除车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  const base = { vehicleId: 'dashboard-delete-car', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'dashboard-delete-new', amountCents: 2000, occurredAt: '2026-09-11T10:00' })
+  await db.saveRecord({ ...base, id: 'dashboard-delete-next', amountCents: 1000, occurredAt: '2026-09-10T10:00' })
+  render(<MemoryRouter><App /></MemoryRouter>)
+
+  const newest = await screen.findByRole('button', { name: /2026年9月11日 10:00 停车 ¥20\.00/ })
+  const next = screen.getByRole('button', { name: /2026年9月10日 10:00 停车 ¥10\.00/ })
+  fireEvent.click(newest)
+  fireEvent.click(within(screen.getByRole('dialog', { name: '记录详情' })).getByRole('button', { name: '删除记录' }))
+
+  await waitFor(() => expect(screen.queryByRole('button', { name: /2026年9月11日 10:00/ })).not.toBeInTheDocument())
+  await waitFor(() => expect(next).toHaveFocus())
+  expect(screen.getByRole('status')).toHaveTextContent('记录已删除')
+})
+
+it('reorders dashboard recent records immediately after editing the occurrence time', async () => {
+  await db.saveVehicle({ id: 'dashboard-edit-car', name: '首页编辑车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  const base = { vehicleId: 'dashboard-edit-car', category: 'parking' as const, excludedFromEnergy: false, createdAt: '', updatedAt: '' }
+  await db.saveRecord({ ...base, id: 'dashboard-edit-new', amountCents: 2000, occurredAt: '2026-09-11T10:00' })
+  await db.saveRecord({ ...base, id: 'dashboard-edit-old', amountCents: 1000, occurredAt: '2026-09-10T10:00' })
+  render(<MemoryRouter><App /></MemoryRouter>)
+
+  fireEvent.click(await screen.findByRole('button', { name: /2026年9月10日 10:00 停车 ¥10\.00/ }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: '记录详情' })).getByRole('button', { name: '编辑记录' }))
+  const edit = screen.getByRole('dialog', { name: '编辑记录' })
+  fireEvent.change(within(edit).getByLabelText('发生时间'), { target: { value: '2026-09-12T08:30' } })
+  fireEvent.click(within(edit).getByRole('button', { name: '保存更改' }))
+
+  const list = within(screen.getByRole('heading', { name: '最近记录' }).closest('section')!).getByRole('list', { name: '最近记录列表' })
+  await waitFor(() => expect(within(list).getAllByRole('button')[0]).toHaveAccessibleName(/2026年9月12日 08:30/))
+  expect(screen.getByRole('status')).toHaveTextContent('记录已更新')
+})
+
+it('shows an actionable dashboard recent-record empty state without a useless view-all link', async () => {
+  await db.saveVehicle({ id: 'recent-empty', name: '空状态车', energyType: 'fuel', initialMileage: 0, isDefault: true })
+  render(<MemoryRouter><App /></MemoryRouter>)
+
+  const panel = (await screen.findByRole('heading', { name: '最近记录' })).closest('section')!
+  expect(within(panel).getByText(/尚无记录/)).toBeInTheDocument()
+  expect(within(panel).getByRole('link', { name: '记一笔' })).toHaveAttribute('href', '/record?vehicle=recent-empty')
+  expect(within(panel).queryByRole('link', { name: /查看全部/ })).not.toBeInTheDocument()
+  expect(within(panel).queryByRole('list')).not.toBeInTheDocument()
 })
 
 it('shows a first-use dashboard action when there are no vehicles', () => {

@@ -29,13 +29,117 @@ function MoreReturnButton() { const location = useLocation(), go = useNavigate()
 function MorePage({ data }: { data: Data }) { const selectedVehicle = current(data), defaultVehicle = data.vehicles.find(vehicle => vehicle.isDefault), vehicleStatus = data.vehicles.length ? `共 ${data.vehicles.length} 辆${defaultVehicle ? ` · 默认：${defaultVehicle.name}` : ''}` : '还没有车辆', energyStatus = !data.vehicles.length ? '添加车辆后可使用' : selectedVehicle ? `查看${selectedVehicle.name}的${selectedVehicle.energyType === 'fuel' ? '油耗' : selectedVehicle.energyType === 'electric' ? '电耗' : '能耗'}数据` : '进入后选择一辆车'; return <section className="more-page"><section className="more-section" aria-labelledby="vehicle-and-driving"><h3 id="vehicle-and-driving" className="more-section-title">车辆与用车</h3><div className="more-grid"><Link className="more-card" to="/vehicles" state={{ fromMore: true }}><span className="more-card-icon more-card-icon--teal"><Car size={25} weight="duotone" aria-hidden="true" /></span><span className="more-card-copy"><strong>车辆管理</strong><span className="more-card-status">{vehicleStatus}</span></span><CaretRight className="more-card-chevron" size={20} aria-hidden="true" /></Link><Link className="more-card" to="/energy" state={{ fromMore: true }}><span className="more-card-icon more-card-icon--blue"><Lightning size={25} weight="duotone" aria-hidden="true" /></span><span className="more-card-copy"><strong>能耗统计</strong><span className="more-card-status">{energyStatus}</span></span><CaretRight className="more-card-chevron" size={20} aria-hidden="true" /></Link></div></section><section className="more-section" aria-labelledby="data-and-backup"><h3 id="data-and-backup" className="more-section-title">数据与备份</h3><div className="more-grid"><Link className="more-card more-card--wide" to="/vehicles?data=1" state={{ fromMore: true }}><span className="more-card-icon more-card-icon--violet"><Database size={25} weight="duotone" aria-hidden="true" /></span><span className="more-card-copy"><strong>数据管理</strong><span className="more-card-status">本机数据 · 导出备份与导入恢复</span></span><CaretRight className="more-card-chevron" size={20} aria-hidden="true" /></Link></div></section></section> }
 
 function Dashboard({ data }: { data: Data }) {
-  const [selectedMonth, setSelectedMonth] = useState(month()), [showAllCategories, setShowAllCategories] = useState(false), [selectedRecord, setSelectedRecord] = useState<ExpenseRecord>(), [editingRecord, setEditingRecord] = useState<ExpenseRecord>(), records = scoped(data), selected = current(data), summary = monthSummary(records, selectedMonth), perKm = selected ? monthlyCostPerKm(records, selectedMonth) : undefined
-  if (!data.vehicles.length) return <section className="dashboard-page"><h2>首页总览</h2><p>先添加一辆车，开始记录用车费用。</p><Link to="/vehicles">新增第一辆车</Link></section>
-  const end = endOfMonth(selectedMonth), monthly = records.filter(record => record.occurredAt.startsWith(selectedMonth)), categoryValues = byCategory(monthly), visibleCategories = showAllCategories ? categoryValues : categoryValues.slice(0, 5), recent = [...records].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 5)
+  const [selectedMonth, setSelectedMonth] = useState(month())
+  const [showAllCategories, setShowAllCategories] = useState(false)
+  const [selectedRecord, setSelectedRecord] = useState<ExpenseRecord>()
+  const [editingRecord, setEditingRecord] = useState<ExpenseRecord>()
+  const [copyingRecord, setCopyingRecord] = useState<ExpenseRecord>()
+  const [status, setStatus] = useState('')
+  const detailRef = useRef<HTMLHeadingElement | null>(null)
+  const drawerRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const recentHeadingRef = useRef<HTMLHeadingElement | null>(null)
+  const emptyActionRef = useRef<HTMLAnchorElement | null>(null)
+  const pendingFocusIndexRef = useRef<number | undefined>(undefined)
+  const records = scoped(data)
+  const selected = current(data)
+  const summary = monthSummary(records, selectedMonth)
+  const perKm = selected ? monthlyCostPerKm(records, selectedMonth) : undefined
+  const end = endOfMonth(selectedMonth)
+  const monthly = records.filter(record => record.occurredAt.startsWith(selectedMonth))
+  const categoryValues = byCategory(monthly)
+  const visibleCategories = showAllCategories ? categoryValues : categoryValues.slice(0, 5)
+  const recent = [...records].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt) || left.id.localeCompare(right.id)).slice(0, 5)
   const completeEnergy = selected ? (selected.energyType !== 'electric' ? filterEnergyIntervals(energyIntervals(records, 'fuel'), { start: `${selectedMonth}-01`, end }).length : 0) + (selected.energyType !== 'fuel' ? filterEnergyIntervals(energyIntervals(records, 'charge'), { start: `${selectedMonth}-01`, end }).length : 0) : 0
-  const hasEnergyRecord = monthly.some(record => record.category === 'fuel' || record.category === 'charge'), recordLink = (category?: string, vehicleId?: string) => { const params = new URLSearchParams({ start: `${selectedMonth}-01`, end, ...(selected ? { vehicle: selected.id } : {}), ...(vehicleId ? { vehicle: vehicleId } : {}), ...(category ? { category } : {}) }); return `/records?${params}` }
+  const hasEnergyRecord = monthly.some(record => record.category === 'fuel' || record.category === 'charge')
+  const recordLink = (category?: string, vehicleId?: string) => {
+    const params = new URLSearchParams({ start: `${selectedMonth}-01`, end, ...(selected ? { vehicle: selected.id } : {}), ...(vehicleId ? { vehicle: vehicleId } : {}), ...(category ? { category } : {}) })
+    return `/records?${params}`
+  }
+  const recentRecordsUrl = selected ? `/records?vehicle=${encodeURIComponent(selected.id)}` : '/records'
+  const recordEntryUrl = selected ? `/record?vehicle=${encodeURIComponent(selected.id)}` : '/record'
   const hasReminder = summary.count === 0 || Boolean(selected && hasEnergyRecord && completeEnergy === 0)
-  return <section className="dashboard-page"><div className="dashboard-heading"><h2>首页总览</h2><div className="toolbar"><label>统计月份<input aria-label="首页月份" type="month" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} /></label><button onClick={() => setSelectedMonth(month())}>本月</button><Link to={recordLink()}>查看本月记录</Link></div></div><div className="metrics">{selected ? <><Metric label="本月费用" value={formatMoney(summary.totalCents)} /><Metric label="本月记录" value={`${summary.count} 笔`} /><Metric label="平均每笔费用" value={summary.averageCents === undefined ? '数据不足' : formatMoney(summary.averageCents)} /><Metric label="当前里程" value={`${highestMileage(selected, records)} km`} /><Metric label="单公里成本" value={perKm?.costPerKm === undefined ? perKm?.reason ?? '数据不足' : `${formatMoney(perKm.costPerKm)}/km`} /></> : <><Metric label="本月总费用" value={formatMoney(summary.totalCents)} /><Metric label="本月记录" value={`${summary.count} 笔`} /><Metric label="平均每笔费用" value={summary.averageCents === undefined ? '数据不足' : formatMoney(summary.averageCents)} /><Metric label="活跃车辆" value={`${data.vehicles.length} 辆`} /></>}</div><p className="muted">较上月：{summary.changePercent === undefined ? '数据不足' : `${summary.changePercent >= 0 ? '+' : ''}${summary.changePercent.toFixed(1)}%`}</p><div className="grid-two"><Panel title="本月费用构成">{visibleCategories.length ? <ul className="simple-list">{visibleCategories.map(([category, value]) => <li key={category}><Link to={recordLink(category)}>{categoryLabels[category as ExpenseCategory]}</Link><strong>{formatMoney(value)} · {summary.totalCents ? Math.round(value / summary.totalCents * 100) : 0}%</strong></li>)}</ul> : <p className="muted">暂无数据</p>}{categoryValues.length > 5 && <button onClick={() => setShowAllCategories(value => !value)}>{showAllCategories ? '收起类别' : '显示全部类别'}</button>}</Panel></div><div className="grid-two"><Panel title="最近记录">{recent.length ? <ul className="simple-list">{recent.map(record => <li key={record.id}><button className="record-row" aria-label={`查看记录：${categoryLabels[record.category]} ${formatDate(record.occurredAt)}`} onClick={() => setSelectedRecord(record)}><span>{formatDate(record.occurredAt)} · {categoryLabels[record.category]}</span><strong>{formatMoney(record.amountCents)}</strong></button></li>)}</ul> : <p>尚无记录。<Link to="/record">记一笔</Link></p>}</Panel>{hasReminder && <Panel title="提醒">{summary.count === 0 && <p>本月暂无用车记录。<Link to="/record">记一笔</Link></p>}{selected && hasEnergyRecord && completeEnergy === 0 && <p>能耗数据尚未形成完整区间，请补充里程并标记加满或充满。<Link to="/energy">查看能耗详情</Link></p>}</Panel>}</div>{!selected && <Panel title="车辆费用对比">{data.vehicles.length ? <ul className="simple-list">{data.vehicles.map(vehicle => <li key={vehicle.id}><Link to={recordLink(undefined, vehicle.id)}>{vehicle.name}</Link><strong>{formatMoney(totalCents(monthly.filter(record => record.vehicleId === vehicle.id)))}</strong></li>)}</ul> : <p className="muted">暂无车辆</p>}</Panel>}{selectedRecord && <div className="drawer" role="dialog" aria-label="记录详情"><button onClick={() => setSelectedRecord(undefined)}>关闭</button><h3>{formatDate(selectedRecord.occurredAt)} · {categoryLabels[selectedRecord.category]}</h3><p>金额：{formatMoney(selectedRecord.amountCents)}</p><p>车辆：{data.vehicles.find(vehicle => vehicle.id === selectedRecord.vehicleId)?.name ?? '已删除'}</p>{selectedRecord.mileage !== undefined && <p>里程：{selectedRecord.mileage} km</p>}{selectedRecord.merchantOrLocation && <p>商家或地点：{selectedRecord.merchantOrLocation}</p>}{selectedRecord.notes && <p>备注：{selectedRecord.notes}</p>}<button onClick={() => { setEditingRecord(selectedRecord); setSelectedRecord(undefined) }}>编辑记录</button></div>}{editingRecord && <div className="drawer" role="dialog" aria-label="编辑记录"><button onClick={() => setEditingRecord(undefined)}>关闭</button><RecordForm data={data} record={editingRecord} done={() => setEditingRecord(undefined)} /></div>}</section>
+  const recentKey = recent.map(record => record.id).join('|')
+  const restoreFocus = (fallback = false) => window.setTimeout(() => {
+    if (triggerRef.current?.isConnected) return triggerRef.current.focus()
+    if (!fallback) return
+    const rows = Array.from(document.querySelectorAll<HTMLButtonElement>('.dashboard-recent-row'))
+    const index = pendingFocusIndexRef.current ?? 0
+    const next = rows[Math.min(index, Math.max(0, rows.length - 1))]
+    if (next) next.focus()
+    else if (emptyActionRef.current?.isConnected) emptyActionRef.current.focus()
+    else recentHeadingRef.current?.focus()
+    pendingFocusIndexRef.current = undefined
+  })
+  const closeViewing = () => { setSelectedRecord(undefined); restoreFocus() }
+  const closeEditing = () => { setEditingRecord(undefined); restoreFocus() }
+  const closeCopying = () => { setCopyingRecord(undefined); restoreFocus() }
+  const openViewing = (record: ExpenseRecord, trigger: HTMLButtonElement) => { triggerRef.current = trigger; setSelectedRecord(record) }
+  const editViewing = () => { if (!selectedRecord) return; setEditingRecord(selectedRecord); setSelectedRecord(undefined) }
+  const copyViewing = () => { if (!selectedRecord) return; setCopyingRecord(selectedRecord); setSelectedRecord(undefined) }
+  const removeRecord = async (record: ExpenseRecord) => {
+    const vehicleName = data.vehicles.find(vehicle => vehicle.id === record.vehicleId)?.name ?? '已删除车辆'
+    if (!window.confirm(`确定删除 ${formatDate(record.occurredAt)} · ${vehicleName} · ${categoryLabels[record.category]} · ${formatMoney(record.amountCents)} 这条记录吗？`)) return
+    try {
+      pendingFocusIndexRef.current = Math.max(0, recent.findIndex(item => item.id === record.id))
+      await db.removeRecord(record.id)
+      setSelectedRecord(undefined)
+      setStatus('记录已删除。')
+    } catch {
+      pendingFocusIndexRef.current = undefined
+      setStatus('删除失败，请检查本地数据后重试。')
+    }
+  }
+  useEffect(() => { if (selectedRecord) window.setTimeout(() => detailRef.current?.focus()) }, [selectedRecord])
+  useEffect(() => { if (pendingFocusIndexRef.current !== undefined) restoreFocus(true) }, [recentKey])
+  useEffect(() => {
+    if (!selectedRecord && !editingRecord && !copyingRecord) return
+    const keepFocusInDrawer = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (copyingRecord) closeCopying()
+        else if (editingRecord) closeEditing()
+        else closeViewing()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusable = Array.from(drawerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])
+      const first = focusable[0], last = focusable.at(-1)
+      if (!first || !last) return
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    window.addEventListener('keydown', keepFocusInDrawer)
+    return () => window.removeEventListener('keydown', keepFocusInDrawer)
+  }, [copyingRecord, editingRecord, selectedRecord])
+
+  if (!data.vehicles.length) return <section className="dashboard-page"><h2>首页总览</h2><p>先添加一辆车，开始记录用车费用。</p><Link to="/vehicles">新增第一辆车</Link></section>
+
+  return <section className="dashboard-page">
+    <div className="dashboard-heading"><h2>首页总览</h2><div className="toolbar"><label>统计月份<input aria-label="首页月份" type="month" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} /></label><button onClick={() => setSelectedMonth(month())}>本月</button><Link to={recordLink()}>查看本月记录</Link></div></div>
+    <div className="metrics">{selected ? <><Metric label="本月费用" value={formatMoney(summary.totalCents)} /><Metric label="本月记录" value={`${summary.count} 笔`} /><Metric label="平均每笔费用" value={summary.averageCents === undefined ? '数据不足' : formatMoney(summary.averageCents)} /><Metric label="当前里程" value={`${highestMileage(selected, records)} km`} /><Metric label="单公里成本" value={perKm?.costPerKm === undefined ? perKm?.reason ?? '数据不足' : `${formatMoney(perKm.costPerKm)}/km`} /></> : <><Metric label="本月总费用" value={formatMoney(summary.totalCents)} /><Metric label="本月记录" value={`${summary.count} 笔`} /><Metric label="平均每笔费用" value={summary.averageCents === undefined ? '数据不足' : formatMoney(summary.averageCents)} /><Metric label="活跃车辆" value={`${data.vehicles.length} 辆`} /></>}</div>
+    <p className="muted">较上月：{summary.changePercent === undefined ? '数据不足' : `${summary.changePercent >= 0 ? '+' : ''}${summary.changePercent.toFixed(1)}%`}</p>
+    <div className="grid-two">
+      <section className="panel dashboard-recent">
+        <header className="dashboard-recent-heading"><h3 ref={recentHeadingRef} tabIndex={-1}>最近记录</h3>{recent.length > 0 && <Link to={recentRecordsUrl}>查看全部<CaretRight aria-hidden="true" size={18} /></Link>}</header>
+        {recent.length ? <ul className="dashboard-recent-list" aria-label="最近记录列表">{recent.map(record => {
+          const vehicleName = data.vehicles.find(vehicle => vehicle.id === record.vehicleId)?.name ?? '已删除'
+          const categoryLabel = categoryLabels[record.category]
+          const amount = formatMoney(record.amountCents)
+          const recordTime = record.occurredAt.slice(11, 16)
+          const compactTime = `${record.occurredAt.slice(5, 10)} ${recordTime}`
+          const accessibleName = `查看记录：${formatDate(record.occurredAt)} ${recordTime} ${categoryLabel} ${amount}${!selected ? ` ${vehicleName}` : ''}`
+          return <li key={record.id}><button className="dashboard-recent-row" aria-label={accessibleName} onClick={event => openViewing(record, event.currentTarget)}><span className={`dashboard-recent-icon dashboard-recent-icon--${record.category}`}><AppIcon category={record.category} size={22} /></span><span className="dashboard-recent-main"><strong className="dashboard-recent-category">{categoryLabel}</strong>{!selected && <span className="dashboard-recent-vehicle">{vehicleName}</span>}</span><span className="dashboard-recent-side"><strong className="dashboard-recent-amount">{amount}</strong><span className="dashboard-recent-time">{compactTime}</span></span></button></li>
+        })}</ul> : <p className="dashboard-recent-empty"><span>尚无记录</span><Link ref={emptyActionRef} to={recordEntryUrl}>记一笔</Link></p>}
+      </section>
+      {hasReminder && <Panel title="提醒">{summary.count === 0 && <p>本月暂无用车记录。<Link to="/record">记一笔</Link></p>}{selected && hasEnergyRecord && completeEnergy === 0 && <p>能耗数据尚未形成完整区间，请补充里程并标记加满或充满。<Link to="/energy">查看能耗详情</Link></p>}</Panel>}
+    </div>
+    <div className="grid-two"><Panel title="本月费用构成">{visibleCategories.length ? <ul className="simple-list">{visibleCategories.map(([category, value]) => <li key={category}><Link to={recordLink(category)}>{categoryLabels[category as ExpenseCategory]}</Link><strong>{formatMoney(value)} · {summary.totalCents ? Math.round(value / summary.totalCents * 100) : 0}%</strong></li>)}</ul> : <p className="muted">暂无数据</p>}{categoryValues.length > 5 && <button onClick={() => setShowAllCategories(value => !value)}>{showAllCategories ? '收起类别' : '显示全部类别'}</button>}</Panel></div>
+    {!selected && <Panel title="车辆费用对比">{data.vehicles.length ? <ul className="simple-list">{data.vehicles.map(vehicle => <li key={vehicle.id}><Link to={recordLink(undefined, vehicle.id)}>{vehicle.name}</Link><strong>{formatMoney(totalCents(monthly.filter(record => record.vehicleId === vehicle.id)))}</strong></li>)}</ul> : <p className="muted">暂无车辆</p>}</Panel>}
+    {status && <p className={status.includes('失败') ? 'error' : 'save-status'} role={status.includes('失败') ? 'alert' : 'status'}>{status}</p>}
+    {selectedRecord && <div ref={drawerRef} className="drawer" role="dialog" aria-label="记录详情" aria-modal="true"><button onClick={closeViewing}>关闭</button><h3 ref={detailRef} tabIndex={-1}>记录详情</h3><p>发生时间：{formatDate(selectedRecord.occurredAt)} {selectedRecord.occurredAt.slice(11, 16)}</p><p>车辆：{data.vehicles.find(vehicle => vehicle.id === selectedRecord.vehicleId)?.name ?? '已删除'}</p><p>类别：{categoryLabels[selectedRecord.category]}</p><p>金额：{formatMoney(selectedRecord.amountCents)}</p><p>里程：{selectedRecord.mileage === undefined ? '未填写' : `${selectedRecord.mileage} km`}</p>{selectedRecord.merchantOrLocation && <p>商家或地点：{selectedRecord.merchantOrLocation}</p>}{selectedRecord.notes && <p>备注：{selectedRecord.notes}</p>}{selectedRecord.category === 'fuel' && <><p>加油量：{selectedRecord.fuelLiters === undefined ? '未填写' : `${selectedRecord.fuelLiters.toFixed(2)} L`}</p><p>油品标号：{selectedRecord.fuelGrade ?? '未填写'}</p><p>单价：{selectedRecord.unitPriceCents === undefined ? '未填写' : `${formatMoney(selectedRecord.unitPriceCents)}/L`}</p><p>加满状态：{selectedRecord.isFullFuel ? '已加满' : '未加满'}</p></>}{selectedRecord.category === 'charge' && <><p>充电量：{selectedRecord.chargeKwh === undefined ? '未填写' : `${selectedRecord.chargeKwh.toFixed(2)} kWh`}</p><p>充电方式：{selectedRecord.chargeMethod ?? '未填写'}</p><p>单价：{selectedRecord.unitPriceCents === undefined ? '未填写' : `${formatMoney(selectedRecord.unitPriceCents)}/kWh`}</p><p>充满状态：{selectedRecord.isFullCharge ? '已充满' : '未充满'}</p></>}<p>创建时间：{selectedRecord.createdAt ? new Date(selectedRecord.createdAt).toLocaleString('zh-CN') : '—'}</p><p>更新时间：{selectedRecord.updatedAt ? new Date(selectedRecord.updatedAt).toLocaleString('zh-CN') : '—'}</p><div className="record-detail-actions"><button onClick={editViewing}>编辑记录</button><button onClick={copyViewing}>复制为新记录</button></div><div className="record-detail-danger"><p>危险操作</p><button className="danger" onClick={() => void removeRecord(selectedRecord)}>删除记录</button></div></div>}
+    {editingRecord && <div ref={drawerRef} className="drawer" role="dialog" aria-label="编辑记录" aria-modal="true"><button autoFocus onClick={closeEditing}>关闭</button><RecordForm data={data} record={editingRecord} done={() => { setEditingRecord(undefined); setStatus('记录已更新。'); restoreFocus(true) }} /></div>}
+    {copyingRecord && <div ref={drawerRef} className="drawer" role="dialog" aria-label="复制记录" aria-modal="true"><button autoFocus onClick={closeCopying}>关闭</button><RecordForm data={data} copyFrom={copyingRecord} done={() => { setCopyingRecord(undefined); setStatus('已创建副本。'); restoreFocus(true) }} /></div>}
+  </section>
 }
 function RecordPage({ data }: { data: Data }) { const go = useNavigate(), [params] = useSearchParams(), vehicle = params.get('vehicle'), date = params.get('date'), calendarMonth = params.get('month'), calendarDay = params.get('day'), returnTo = params.get('from') === 'calendar' && /^\d{4}-(0[1-9]|1[0-2])$/.test(calendarMonth ?? '') && calendarDay?.startsWith(calendarMonth!) ? `/calendar?month=${calendarMonth}&day=${calendarDay}` : undefined; return <section className="record-page"><div className="record-page-heading"><button className="icon-button" type="button" aria-label="返回" onClick={() => go(-1)}><CaretLeft aria-hidden="true" size={24} /></button><div><h2>用车记账</h2><p className="muted">选择车辆和场景后，填写本次用车费用。</p></div></div><RecordForm data={data} preset={params.get('category') as ExpenseCategory | null} presetDate={date ?? undefined} presetVehicle={data.vehicles.some(item => item.id === vehicle) ? vehicle ?? undefined : undefined} returnTo={returnTo} /></section> }
 function FieldError({ message }: { message?: string }) { return message ? <span className="field-error" role="alert">{message}</span> : null }

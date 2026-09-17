@@ -1,4 +1,55 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+
+async function seedRecentRecords(page: Page) {
+  await page.goto('/')
+  await page.getByRole('heading', { name: '首页总览' }).waitFor()
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('car-expense-app')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const transaction = database.transaction(['vehicles', 'records', 'settings'], 'readwrite')
+    const now = new Date().toISOString()
+    transaction.objectStore('vehicles').put({ id: 'dashboard-v21-primary', name: '家庭通勤车', energyType: 'fuel', initialMileage: 0, isDefault: true, createdAt: now, updatedAt: now })
+    transaction.objectStore('vehicles').put({ id: 'dashboard-v21-long', name: '周末跨城出行超长车辆名称', energyType: 'electric', initialMileage: 0, isDefault: false, createdAt: now, updatedAt: now })
+    const records = [
+      ['dashboard-v21-1', 'dashboard-v21-long', 'toll', 123456789, '2026-09-12T23:59'],
+      ['dashboard-v21-2', 'dashboard-v21-primary', 'maintenance', 456700, '2026-09-11T08:05'],
+      ['dashboard-v21-3', 'dashboard-v21-long', 'parking', 1200, '2026-09-10T21:51'],
+      ['dashboard-v21-4', 'dashboard-v21-primary', 'wash', 3600, '2026-09-09T09:30'],
+      ['dashboard-v21-5', 'dashboard-v21-long', 'fine', 20000, '2026-09-08T18:20'],
+      ['dashboard-v21-6', 'dashboard-v21-primary', 'insurance', 300000, '2026-09-07T07:15'],
+    ]
+    for (const [id, vehicleId, category, amountCents, occurredAt] of records) transaction.objectStore('records').put({ id, vehicleId, category, amountCents, occurredAt, excludedFromEnergy: false, createdAt: now, updatedAt: now })
+    transaction.objectStore('settings').put({ id: 'app', defaultVehicleId: 'dashboard-v21-primary', selectedVehicleId: 'all' })
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+    database.close()
+  })
+  await page.reload()
+  await expect(page.getByRole('list', { name: '最近记录列表' }).getByRole('listitem')).toHaveCount(5)
+}
+
+async function expectRecentLayout(page: Page) {
+  const result = await page.locator('.dashboard-recent').evaluate(panel => {
+    const rows = Array.from(panel.querySelectorAll<HTMLElement>('.dashboard-recent-row'))
+    const overlaps = rows.some(row => {
+      const icon = row.querySelector<HTMLElement>('.dashboard-recent-icon')!.getBoundingClientRect()
+      const main = row.querySelector<HTMLElement>('.dashboard-recent-main')!.getBoundingClientRect()
+      const side = row.querySelector<HTMLElement>('.dashboard-recent-side')!.getBoundingClientRect()
+      const bounds = row.getBoundingClientRect()
+      return icon.right > main.left + 1 || main.right > side.left + 1 || side.right > bounds.right + 1 || bounds.height < 44
+    })
+    const documentOverflow = document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+    const offenders = documentOverflow ? Array.from(document.querySelectorAll<HTMLElement>('body *')).filter(element => { const bounds = element.getBoundingClientRect(); return bounds.right > document.documentElement.clientWidth + 1 || bounds.left < -1 || element.scrollWidth > element.clientWidth + 1 }).slice(0, 8).map(element => { const bounds = element.getBoundingClientRect(); return `${element.tagName.toLowerCase()}.${element.className}[${Math.round(bounds.left)},${Math.round(bounds.right)};${element.clientWidth}/${element.scrollWidth}]` }) : []
+    return { overlaps, documentOverflow, offenders, widths: [window.innerWidth, document.documentElement.clientWidth, document.documentElement.scrollWidth, document.body.scrollWidth] }
+  })
+  expect(result, `viewport and document widths: ${result.widths.join('/')}; offenders: ${result.offenders.join(', ')}`).toMatchObject({ overlaps: false, documentOverflow: false, offenders: [] })
+}
 
 test('filters dashboard records by month and keeps the filter in detailed records', async ({ page }) => {
   await page.goto('/vehicles')
@@ -92,7 +143,7 @@ test('only renders actionable dashboard reminders and fills the empty grid space
   await page.getByLabel('首页月份').fill('2026-08')
 
   await expect(page.getByRole('heading', { name: '提醒' })).toHaveCount(0)
-  const recentPanel = page.getByRole('heading', { name: '最近记录' }).locator('..')
+  const recentPanel = page.locator('.dashboard-recent')
   const recentGrid = recentPanel.locator('..')
   await expect.poll(async () => {
     const [panel, grid] = await Promise.all([recentPanel.boundingBox(), recentGrid.boundingBox()])
@@ -103,5 +154,54 @@ test('only renders actionable dashboard reminders and fills the empty grid space
   const reminder = page.getByRole('heading', { name: '提醒' }).locator('..')
   await expect(reminder).toContainText('本月暂无用车记录。')
   await expect(reminder.getByRole('link', { name: '记一笔' })).toHaveAttribute('href', '/record')
+  expect(browserErrors).toEqual([])
+})
+
+test('opens dashboard recent details with Enter and Space and keeps view-all navigation clean', async ({ page }) => {
+  await seedRecentRecords(page)
+  const firstRecord = page.getByRole('list', { name: '最近记录列表' }).getByRole('button').first()
+
+  await firstRecord.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('dialog', { name: '记录详情' })).toBeVisible()
+  await page.getByRole('dialog', { name: '记录详情' }).getByRole('button', { name: '关闭' }).click()
+  await expect(firstRecord).toBeFocused()
+
+  await page.keyboard.press('Space')
+  await expect(page.getByRole('dialog', { name: '记录详情' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: '记录详情' })).toHaveCount(0)
+  await expect(firstRecord).toBeFocused()
+
+  await page.getByRole('link', { name: '查看全部' }).click()
+  await expect(page).toHaveURL(/\/records$/)
+  await page.goBack()
+  await expect(page.getByRole('heading', { name: '最近记录' })).toBeVisible()
+})
+
+test('keeps V1.21 recent records readable across required breakpoints and enlarged text', async ({ page }) => {
+  const browserErrors: string[] = []
+  page.on('console', message => { if (message.type() === 'error') browserErrors.push(message.text()) })
+  page.on('pageerror', error => browserErrors.push(error.message))
+  await seedRecentRecords(page)
+
+  for (const viewport of [
+    { width: 320, height: 760 },
+    { width: 375, height: 812 },
+    { width: 390, height: 844 },
+    { width: 414, height: 896 },
+    { width: 430, height: 932 },
+    { width: 767, height: 900 },
+    { width: 768, height: 900 },
+    { width: 1280, height: 900 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await expectRecentLayout(page)
+  }
+
+  await page.setViewportSize({ width: 430, height: 932 })
+  await page.addStyleTag({ content: '.dashboard-recent-category,.dashboard-recent-amount{font-size:200%!important}.dashboard-recent-vehicle,.dashboard-recent-time{font-size:150%!important}' })
+  await expectRecentLayout(page)
   expect(browserErrors).toEqual([])
 })
