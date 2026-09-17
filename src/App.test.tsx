@@ -412,9 +412,8 @@ it('shows calendar-specific empty states and requires a vehicle when all vehicle
   const second = render(<MemoryRouter initialEntries={['/calendar']}><App /></MemoryRouter>)
   expect(await screen.findByText('还没有用车费用记录。')).toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('当前车辆'), { target: { value: 'all' } })
-  const todayLink = screen.getByRole('link', { name: '为今天记一笔' })
-  await waitFor(() => expect(todayLink).not.toHaveAttribute('href', expect.stringContaining('vehicle=')))
-  fireEvent.click(todayLink)
+  expect(screen.queryByRole('link', { name: '为今天记一笔' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '记一笔' }))
   await waitFor(() => expect(screen.getByLabelText('所属车辆')).toHaveValue(''))
   second.unmount()
 

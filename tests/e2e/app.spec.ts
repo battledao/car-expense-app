@@ -161,6 +161,8 @@ test('lays out the expense calendar without overlap on desktop and narrow screen
   await page.getByRole('button', { name: '保存车辆' }).click()
   await page.getByRole('link', { name: '费用日历' }).click()
 
+  await expect(page.locator('.calendar-heading').getByRole('link', { name: '为今天记一笔' })).toHaveCount(0)
+  await expect(page.locator('.global-header').getByRole('button', { name: '记一笔' })).toBeVisible()
   await expect(page.getByLabel('费用日历月份')).toBeVisible()
   await expect(page.locator('.calendar-page .toolbar')).not.toContainText('费用日历月份')
   const currentMonth = await page.getByLabel('费用日历月份').inputValue()
