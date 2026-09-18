@@ -175,6 +175,29 @@ test('uses one V1.23 expense overview and switches its three contextual metrics'
 
   const overview = page.getByLabel('费用概览')
   await expect(overview).toBeVisible()
+  const tone = await overview.evaluate(card => ({
+    overview: getComputedStyle(card).backgroundImage,
+    hero: getComputedStyle(card.querySelector<HTMLElement>('.dashboard-overview-hero')!).backgroundImage,
+    overviewArt: getComputedStyle(card, '::after').backgroundImage,
+    overviewArtSize: getComputedStyle(card, '::after').backgroundSize,
+    heroArt: getComputedStyle(card.querySelector<HTMLElement>('.dashboard-overview-hero')!, '::after').backgroundImage,
+    stats: getComputedStyle(card.querySelector<HTMLElement>('.dashboard-overview-stats')!).backgroundColor,
+    statsDivider: getComputedStyle(card.querySelector<HTMLElement>('.dashboard-overview-stats')!).borderTopWidth,
+    itemDivider: getComputedStyle(card.querySelectorAll<HTMLElement>('.dashboard-overview-stat')[1]).borderLeftWidth,
+    artSpace: card.getBoundingClientRect().bottom
+      - card.querySelector<HTMLElement>('.dashboard-overview-stats')!.getBoundingClientRect().bottom,
+    cardHeight: card.getBoundingClientRect().height,
+  }))
+  expect(tone.overview).toContain('linear-gradient')
+  expect(tone.hero).toBe('none')
+  expect(tone.overviewArt).toContain('dashboard-car-city')
+  expect(tone.overviewArtSize).toBe('auto 140px')
+  expect(tone.heroArt).toBe('none')
+  expect(tone.stats).toBe('rgba(0, 0, 0, 0)')
+  expect(tone.statsDivider).toBe('0px')
+  expect(tone.itemDivider).toBe('0px')
+  expect(tone.artSpace).toBeGreaterThanOrEqual(100)
+  expect(tone.cardHeight).toBeLessThanOrEqual(320)
   await expect(overview.getByText('较上月：数据不足')).toBeVisible()
   await expect(overview.getByText('活跃车辆')).toBeVisible()
   await expect(overview.getByText('当前里程')).toHaveCount(0)

@@ -161,16 +161,15 @@ body { background: var(--ui-bg); color: var(--ui-text); }
 .dashboard-page .toolbar label { display: flex; align-items: center; gap: 7px; color: var(--ui-muted); font-size: 13px; }
 .dashboard-page .toolbar input { min-height: 40px; border: 1px solid var(--ui-line); border-radius: 10px; background: var(--ui-surface); }
 .dashboard-page .toolbar > a, .dashboard-page .toolbar > button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 12px; border: 1px solid var(--ui-line); border-radius: 11px; color: var(--ui-text); background: var(--ui-surface); font-weight: 700; text-decoration: none; }
-.dashboard-overview { overflow: hidden; margin: 20px 0 24px; padding: 0; border: 1px solid #cde7e5; border-radius: 18px; background: var(--ui-surface); box-shadow: var(--ui-shadow); }
-.dashboard-overview-hero { position: relative; min-height: 220px; overflow: hidden; padding: 32px; background: linear-gradient(112deg, #fff 14%, #f0fbfa 100%); }
-.dashboard-overview-hero::after { position: absolute; right: -2px; bottom: -12px; width: 61%; height: 72%; background: url('./assets/dashboard-car-city.webp') no-repeat right bottom / contain; content: ''; opacity: .72; pointer-events: none; }
+.dashboard-overview { position: relative; overflow: hidden; margin: 20px 0 24px; padding: 0 0 100px; border: 1px solid #cde7e5; border-radius: 18px; background: linear-gradient(112deg, #fff 14%, #f0fbfa 100%); box-shadow: var(--ui-shadow); }
+.dashboard-overview::after { position: absolute; right: 0; bottom: 0; width: 100%; height: 100px; background: url('./assets/dashboard-car-city.webp') no-repeat right bottom / auto 140px; content: ''; opacity: .72; pointer-events: none; }
+.dashboard-overview-hero { position: relative; overflow: hidden; padding: 24px 28px 12px; background: transparent; }
 .dashboard-overview-hero > * { position: relative; z-index: 1; }
 .dashboard-overview-hero > span { color: var(--ui-muted); font-size: 17px; }
-.dashboard-overview-hero > strong { display: block; width: fit-content; max-width: 100%; margin-top: 13px; color: var(--ui-teal-strong); font-size: clamp(38px, 5vw, 64px); letter-spacing: -.06em; line-height: 1; overflow-wrap: anywhere; }
-.dashboard-overview-change { width: fit-content; max-width: 100%; margin: 18px 0 0; color: var(--ui-muted); font-size: 14px; }
-.dashboard-overview-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--ui-line); }
-.dashboard-overview-stat { min-width: 0; padding: 20px 22px; }
-.dashboard-overview-stat + .dashboard-overview-stat { border-left: 1px solid var(--ui-line); }
+.dashboard-overview-hero > strong { display: block; width: fit-content; max-width: 100%; margin-top: 8px; color: var(--ui-teal-strong); font-size: clamp(38px, 5vw, 64px); letter-spacing: -.06em; line-height: 1; overflow-wrap: anywhere; }
+.dashboard-overview-change { width: fit-content; max-width: 100%; margin: 10px 0 0; color: var(--ui-muted); font-size: 14px; }
+.dashboard-overview-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dashboard-overview-stat { min-width: 0; padding: 10px 18px; }
 .dashboard-overview-stat span { display: block; color: var(--ui-muted); font-size: 13px; line-height: 1.35; }
 .dashboard-overview-stat strong { display: block; margin-top: 9px; color: var(--ui-text); font-size: 23px; line-height: 1.2; overflow-wrap: anywhere; }
 .dashboard-page .grid-two { gap: 18px; margin-top: 18px; }
@@ -218,10 +217,10 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .dashboard-page .toolbar label { flex: 1 1 100%; }
   .dashboard-page .toolbar input { flex: 1; min-width: 0; }
   .dashboard-page .toolbar > a, .dashboard-page .toolbar > button { flex: 1 1 0; }
-  .dashboard-overview-hero { min-height: 194px; padding: 26px 22px; }
-  .dashboard-overview-hero::after { width: 67%; height: 67%; opacity: .6; }
+  .dashboard-overview-hero { padding: 16px 18px 4px; }
+  .dashboard-overview::after { opacity: .65; }
   .dashboard-overview-hero > strong { font-size: clamp(38px, 12.5vw, 49px); }
-  .dashboard-overview-stat { padding: 15px 10px; }
+  .dashboard-overview-stat { padding: 8px 10px; }
   .dashboard-overview-stat span { font-size: 12px; }
   .dashboard-overview-stat strong { margin-top: 7px; font-size: clamp(16px, 4.8vw, 20px); letter-spacing: -.04em; }
   .dashboard-page .grid-two { grid-template-columns: 1fr; gap: 12px; }
