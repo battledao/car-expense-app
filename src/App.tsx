@@ -3,7 +3,7 @@ import { Component, type FormEvent, useEffect, useMemo, useRef, useState } from 
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, CalendarBlank, CaretLeft, CaretRight, Car, ChartPieSlice, ClipboardText, Database, DotsNine, GasPump, House, Lightning, ListBullets, NotePencil, Plus, Wrench } from '@phosphor-icons/react'
-import { analysisCategories, analysisCostPerKm, analysisDateRange, analysisMonths, analysisSummary, analysisTrend, analysisVehicles, averageEnergy, byCategory, energyDateRange, energyIntervals, energyQuality, energySummary, energyUnavailableReason, energyUnitPriceCents, filterEnergyIntervals, filterRecords, highestMileage, hybridEnergyCost, monthSummary, monthlyCostPerKm, totalCents, vehicleEnergySummary, vehiclesWithEnergyData, type AnalysisRangePreset, type EnergyInterval, type EnergyRangePreset, type RecordFilters } from './calculations'
+import { analysisCategories, analysisCostPerKm, analysisDateRange, analysisMonths, analysisSummary, analysisTrend, analysisVehicles, averageEnergy, energyDateRange, energyIntervals, energyQuality, energySummary, energyUnavailableReason, energyUnitPriceCents, filterEnergyIntervals, filterRecords, highestMileage, hybridEnergyCost, monthSummary, monthlyCostPerKm, totalCents, vehicleEnergySummary, vehiclesWithEnergyData, type AnalysisRangePreset, type EnergyInterval, type EnergyRangePreset, type RecordFilters } from './calculations'
 import { categories, categoryLabels, energyLabels, formatDate, formatMoney, localNow } from './constants'
 import { availableCategories, categoryIcons, fieldsForCategory, isCategoryAvailable, isEnergyCategory, reconcileEnergyValues } from './recordForm'
 import { db } from './db'
@@ -30,7 +30,6 @@ function MorePage({ data }: { data: Data }) { const selectedVehicle = current(da
 
 function Dashboard({ data }: { data: Data }) {
   const [selectedMonth, setSelectedMonth] = useState(month())
-  const [showAllCategories, setShowAllCategories] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<ExpenseRecord>()
   const [editingRecord, setEditingRecord] = useState<ExpenseRecord>()
   const [copyingRecord, setCopyingRecord] = useState<ExpenseRecord>()
@@ -47,13 +46,11 @@ function Dashboard({ data }: { data: Data }) {
   const perKm = selected ? monthlyCostPerKm(records, selectedMonth) : undefined
   const end = endOfMonth(selectedMonth)
   const monthly = records.filter(record => record.occurredAt.startsWith(selectedMonth))
-  const categoryValues = byCategory(monthly)
-  const visibleCategories = showAllCategories ? categoryValues : categoryValues.slice(0, 5)
   const recent = [...records].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt) || left.id.localeCompare(right.id)).slice(0, 5)
   const completeEnergy = selected ? (selected.energyType !== 'electric' ? filterEnergyIntervals(energyIntervals(records, 'fuel'), { start: `${selectedMonth}-01`, end }).length : 0) + (selected.energyType !== 'fuel' ? filterEnergyIntervals(energyIntervals(records, 'charge'), { start: `${selectedMonth}-01`, end }).length : 0) : 0
   const hasEnergyRecord = monthly.some(record => record.category === 'fuel' || record.category === 'charge')
-  const recordLink = (category?: string, vehicleId?: string) => {
-    const params = new URLSearchParams({ start: `${selectedMonth}-01`, end, ...(selected ? { vehicle: selected.id } : {}), ...(vehicleId ? { vehicle: vehicleId } : {}), ...(category ? { category } : {}) })
+  const recordLink = (vehicleId?: string) => {
+    const params = new URLSearchParams({ start: `${selectedMonth}-01`, end, ...(selected ? { vehicle: selected.id } : {}), ...(vehicleId ? { vehicle: vehicleId } : {}) })
     return `/records?${params}`
   }
   const recentRecordsUrl = selected ? `/records?vehicle=${encodeURIComponent(selected.id)}` : '/records'
@@ -133,8 +130,7 @@ function Dashboard({ data }: { data: Data }) {
       </section>
       {hasReminder && <Panel title="提醒">{summary.count === 0 && <p>本月暂无用车记录。<Link to="/record">记一笔</Link></p>}{selected && hasEnergyRecord && completeEnergy === 0 && <p>能耗数据尚未形成完整区间，请补充里程并标记加满或充满。<Link to="/energy">查看能耗详情</Link></p>}</Panel>}
     </div>
-    <div className="grid-two"><Panel title="本月费用构成">{visibleCategories.length ? <ul className="simple-list">{visibleCategories.map(([category, value]) => <li key={category}><Link to={recordLink(category)}>{categoryLabels[category as ExpenseCategory]}</Link><strong>{formatMoney(value)} · {summary.totalCents ? Math.round(value / summary.totalCents * 100) : 0}%</strong></li>)}</ul> : <p className="muted">暂无数据</p>}{categoryValues.length > 5 && <button onClick={() => setShowAllCategories(value => !value)}>{showAllCategories ? '收起类别' : '显示全部类别'}</button>}</Panel></div>
-    {!selected && <Panel title="车辆费用对比">{data.vehicles.length ? <ul className="simple-list">{data.vehicles.map(vehicle => <li key={vehicle.id}><Link to={recordLink(undefined, vehicle.id)}>{vehicle.name}</Link><strong>{formatMoney(totalCents(monthly.filter(record => record.vehicleId === vehicle.id)))}</strong></li>)}</ul> : <p className="muted">暂无车辆</p>}</Panel>}
+    {!selected && <Panel title="车辆费用对比">{data.vehicles.length ? <ul className="simple-list">{data.vehicles.map(vehicle => <li key={vehicle.id}><Link to={recordLink(vehicle.id)}>{vehicle.name}</Link><strong>{formatMoney(totalCents(monthly.filter(record => record.vehicleId === vehicle.id)))}</strong></li>)}</ul> : <p className="muted">暂无车辆</p>}</Panel>}
     {status && <p className={status.includes('失败') ? 'error' : 'save-status'} role={status.includes('失败') ? 'alert' : 'status'}>{status}</p>}
     {selectedRecord && <div ref={drawerRef} className="drawer" role="dialog" aria-label="记录详情" aria-modal="true"><button onClick={closeViewing}>关闭</button><h3 ref={detailRef} tabIndex={-1}>记录详情</h3><p>发生时间：{formatDate(selectedRecord.occurredAt)} {selectedRecord.occurredAt.slice(11, 16)}</p><p>车辆：{data.vehicles.find(vehicle => vehicle.id === selectedRecord.vehicleId)?.name ?? '已删除'}</p><p>类别：{categoryLabels[selectedRecord.category]}</p><p>金额：{formatMoney(selectedRecord.amountCents)}</p><p>里程：{selectedRecord.mileage === undefined ? '未填写' : `${selectedRecord.mileage} km`}</p>{selectedRecord.merchantOrLocation && <p>商家或地点：{selectedRecord.merchantOrLocation}</p>}{selectedRecord.notes && <p>备注：{selectedRecord.notes}</p>}{selectedRecord.category === 'fuel' && <><p>加油量：{selectedRecord.fuelLiters === undefined ? '未填写' : `${selectedRecord.fuelLiters.toFixed(2)} L`}</p><p>油品标号：{selectedRecord.fuelGrade ?? '未填写'}</p><p>单价：{selectedRecord.unitPriceCents === undefined ? '未填写' : `${formatMoney(selectedRecord.unitPriceCents)}/L`}</p><p>加满状态：{selectedRecord.isFullFuel ? '已加满' : '未加满'}</p></>}{selectedRecord.category === 'charge' && <><p>充电量：{selectedRecord.chargeKwh === undefined ? '未填写' : `${selectedRecord.chargeKwh.toFixed(2)} kWh`}</p><p>充电方式：{selectedRecord.chargeMethod ?? '未填写'}</p><p>单价：{selectedRecord.unitPriceCents === undefined ? '未填写' : `${formatMoney(selectedRecord.unitPriceCents)}/kWh`}</p><p>充满状态：{selectedRecord.isFullCharge ? '已充满' : '未充满'}</p></>}<p>创建时间：{selectedRecord.createdAt ? new Date(selectedRecord.createdAt).toLocaleString('zh-CN') : '—'}</p><p>更新时间：{selectedRecord.updatedAt ? new Date(selectedRecord.updatedAt).toLocaleString('zh-CN') : '—'}</p><div className="record-detail-actions"><button onClick={editViewing}>编辑记录</button><button onClick={copyViewing}>复制为新记录</button></div><div className="record-detail-danger"><p>危险操作</p><button className="danger" onClick={() => void removeRecord(selectedRecord)}>删除记录</button></div></div>}
     {editingRecord && <div ref={drawerRef} className="drawer" role="dialog" aria-label="编辑记录" aria-modal="true"><button autoFocus onClick={closeEditing}>关闭</button><RecordForm data={data} record={editingRecord} done={() => { setEditingRecord(undefined); setStatus('记录已更新。'); restoreFocus(true) }} /></div>}

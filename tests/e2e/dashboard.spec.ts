@@ -157,6 +157,26 @@ test('only renders actionable dashboard reminders and fills the empty grid space
   expect(browserErrors).toEqual([])
 })
 
+test('keeps category composition only in analysis and naturally closes the dashboard gap', async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 932 })
+  await seedRecentRecords(page)
+
+  await expect(page.getByText('本月费用构成', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '显示全部类别' })).toHaveCount(0)
+  const recentPanel = page.locator('.dashboard-recent')
+  const comparisonPanel = page.getByRole('heading', { name: '车辆费用对比' }).locator('..')
+  await expect.poll(async () => {
+    const [recent, comparison] = await Promise.all([recentPanel.boundingBox(), comparisonPanel.boundingBox()])
+    return recent && comparison ? comparison.y - (recent.y + recent.height) : Number.POSITIVE_INFINITY
+  }).toBeLessThan(80)
+
+  await page.getByLabel('当前车辆').selectOption('dashboard-v21-primary')
+  await expect(page.getByRole('heading', { name: '车辆费用对比' })).toHaveCount(0)
+  await expect(page.getByText('本月费用构成', { exact: true })).toHaveCount(0)
+  await page.getByRole('link', { name: '数据分析', exact: true }).click()
+  await expect(page.getByRole('link', { name: /费用类别构成/ })).toBeVisible()
+})
+
 test('opens dashboard recent details with Enter and Space and keeps view-all navigation clean', async ({ page }) => {
   await seedRecentRecords(page)
   const firstRecord = page.getByRole('list', { name: '最近记录列表' }).getByRole('button').first()
@@ -175,11 +195,13 @@ test('opens dashboard recent details with Enter and Space and keeps view-all nav
 
   await page.getByRole('link', { name: '查看全部' }).click()
   await expect(page).toHaveURL(/\/records$/)
+  await expect(page.getByRole('heading', { name: '详细记录' })).toBeVisible()
   await page.goBack()
+  await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('heading', { name: '最近记录' })).toBeVisible()
 })
 
-test('keeps V1.21 recent records readable across required breakpoints and enlarged text', async ({ page }) => {
+test('keeps V1.22 dashboard records readable across required breakpoints and enlarged text', async ({ page }) => {
   const browserErrors: string[] = []
   page.on('console', message => { if (message.type() === 'error') browserErrors.push(message.text()) })
   page.on('pageerror', error => browserErrors.push(error.message))

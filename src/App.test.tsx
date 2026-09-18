@@ -844,17 +844,20 @@ it('保留详细记录无车辆时的新增车辆入口', async () => {
   expect(screen.getByRole('link', { name: '新增车辆' })).toHaveAttribute('href', '/vehicles')
 })
 
-it('keeps dashboard trend details out of the home page and expands expense categories on demand', async () => {
+it('keeps expense composition off the dashboard and exposes it only from data analysis', async () => {
   await db.saveVehicle({ id: 'v1', name: '趋势测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   for (const [index, category] of ['fuel', 'charge', 'parking', 'wash', 'maintenance', 'repair'].entries()) await db.saveRecord({ id: `record-${index}`, vehicleId: 'v1', category: category as ExpenseCategory, amountCents: (index + 1) * 1000, occurredAt: `2026-08-${String(index + 1).padStart(2, '0')}T10:00`, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
   render(<MemoryRouter><App /></MemoryRouter>)
 
   fireEvent.change(await screen.findByLabelText('首页月份'), { target: { value: '2026-08' } })
   expect(screen.queryByRole('img', { name: '近六个月费用趋势图' })).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '显示全部类别' })).toBeInTheDocument()
-  expect(screen.queryByRole('link', { name: '加油' })).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: '显示全部类别' }))
-  expect(screen.getByRole('link', { name: '加油' })).toBeInTheDocument()
+  expect(screen.queryByText('本月费用构成')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '显示全部类别' })).not.toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('当前车辆'), { target: { value: 'v1' } })
+  expect(screen.queryByText('本月费用构成')).not.toBeInTheDocument()
+
+  fireEvent.click(screen.getAllByRole('link', { name: '数据分析' })[0])
+  expect(await screen.findByRole('link', { name: /费用类别构成/ })).toBeInTheDocument()
 })
 it('keeps current mileage but removes the vehicle energy summary from the dashboard', async () => {
   await db.saveVehicle({ id: 'v1', name: '能耗首页车', energyType: 'fuel', initialMileage: 0, isDefault: true })
@@ -1020,12 +1023,14 @@ it('shows an actionable dashboard recent-record empty state without a useless vi
   expect(within(panel).getByRole('link', { name: '记一笔' })).toHaveAttribute('href', '/record?vehicle=recent-empty')
   expect(within(panel).queryByRole('link', { name: /查看全部/ })).not.toBeInTheDocument()
   expect(within(panel).queryByRole('list')).not.toBeInTheDocument()
+  expect(screen.queryByText('本月费用构成')).not.toBeInTheDocument()
 })
 
 it('shows a first-use dashboard action when there are no vehicles', () => {
   render(<MemoryRouter><App /></MemoryRouter>)
   expect(screen.getByText('先添加一辆车，开始记录用车费用。')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: '新增第一辆车' })).toHaveAttribute('href', '/vehicles')
+  expect(screen.queryByText('本月费用构成')).not.toBeInTheDocument()
 })
 
 it('groups record scenes by vehicle type and shows the current mileage as a reference', async () => {
