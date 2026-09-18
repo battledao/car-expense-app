@@ -51,6 +51,18 @@ async function expectRecentLayout(page: Page) {
   expect(result, `viewport and document widths: ${result.widths.join('/')}; offenders: ${result.offenders.join(', ')}`).toMatchObject({ overlaps: false, documentOverflow: false, offenders: [] })
 }
 
+async function expectOverviewLayout(page: Page, sameRow = false) {
+  const result = await page.getByLabel('费用概览').evaluate(card => {
+    const items = Array.from(card.querySelectorAll<HTMLElement>('.dashboard-overview-stat'))
+    const bounds = items.map(item => item.getBoundingClientRect())
+    const overlaps = bounds.some((item, index) => bounds.slice(index + 1).some(other => item.left < other.right - 1 && item.right > other.left + 1 && item.top < other.bottom - 1 && item.bottom > other.top + 1))
+    const outside = bounds.some(item => { const parent = card.getBoundingClientRect(); return item.left < parent.left - 1 || item.right > parent.right + 1 })
+    return { count: items.length, rows: new Set(bounds.map(item => Math.round(item.top))).size, overlaps, outside, documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 }
+  })
+  expect(result).toMatchObject({ count: 3, overlaps: false, outside: false, documentOverflow: false })
+  if (sameRow) expect(result.rows).toBe(1)
+}
+
 test('filters dashboard records by month and keeps the filter in detailed records', async ({ page }) => {
   await page.goto('/vehicles')
   await page.getByRole('button', { name: '新增车辆' }).click()
@@ -67,7 +79,7 @@ test('filters dashboard records by month and keeps the filter in detailed record
   await expect(page.getByRole('img', { name: '近六个月费用趋势图' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '车辆与能耗摘要' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: '查看能耗详情' })).toHaveCount(0)
-  await expect(page.locator('.metric').filter({ hasText: '本月费用' })).toContainText('¥25.00')
+  await expect(page.getByLabel('费用概览')).toContainText('本月费用¥25.00')
   await page.getByRole('link', { name: '查看本月记录' }).click()
   await page.getByRole('button', { name: /^筛选(?:，已生效 \d+ 项)?$/ }).click()
   const filters = page.getByRole('dialog', { name: '筛选与排序' })
@@ -157,6 +169,26 @@ test('only renders actionable dashboard reminders and fills the empty grid space
   expect(browserErrors).toEqual([])
 })
 
+test('uses one V1.23 expense overview and switches its three contextual metrics', async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 932 })
+  await seedRecentRecords(page)
+
+  const overview = page.getByLabel('费用概览')
+  await expect(overview).toBeVisible()
+  await expect(overview.getByText('较上月：数据不足')).toBeVisible()
+  await expect(overview.getByText('活跃车辆')).toBeVisible()
+  await expect(overview.getByText('当前里程')).toHaveCount(0)
+  await expect(overview.getByText('单公里成本')).toHaveCount(0)
+  await expect(overview.locator('.metric')).toHaveCount(0)
+  await expectOverviewLayout(page, true)
+
+  await page.getByLabel('当前车辆').selectOption('dashboard-v21-primary')
+  await expect(overview.getByText('当前里程')).toBeVisible()
+  await expect(overview.getByText('活跃车辆')).toHaveCount(0)
+  await expect(overview.getByText('平均每笔费用')).toBeVisible()
+  await expectOverviewLayout(page, true)
+})
+
 test('keeps category composition only in analysis and naturally closes the dashboard gap', async ({ page }) => {
   await page.setViewportSize({ width: 430, height: 932 })
   await seedRecentRecords(page)
@@ -201,7 +233,7 @@ test('opens dashboard recent details with Enter and Space and keeps view-all nav
   await expect(page.getByRole('heading', { name: '最近记录' })).toBeVisible()
 })
 
-test('keeps V1.22 dashboard records readable across required breakpoints and enlarged text', async ({ page }) => {
+test('keeps V1.23 overview and dashboard records readable across required breakpoints and enlarged text', async ({ page }) => {
   const browserErrors: string[] = []
   page.on('console', message => { if (message.type() === 'error') browserErrors.push(message.text()) })
   page.on('pageerror', error => browserErrors.push(error.message))
@@ -219,11 +251,13 @@ test('keeps V1.22 dashboard records readable across required breakpoints and enl
     { width: 844, height: 390 },
   ]) {
     await page.setViewportSize(viewport)
+    await expectOverviewLayout(page, viewport.width >= 320 && viewport.width <= 430)
     await expectRecentLayout(page)
   }
 
   await page.setViewportSize({ width: 430, height: 932 })
-  await page.addStyleTag({ content: '.dashboard-recent-category,.dashboard-recent-amount{font-size:200%!important}.dashboard-recent-vehicle,.dashboard-recent-time{font-size:150%!important}' })
+  await page.addStyleTag({ content: '.dashboard-overview-stat span,.dashboard-overview-stat strong,.dashboard-overview-change{font-size:200%!important}.dashboard-recent-category,.dashboard-recent-amount{font-size:200%!important}.dashboard-recent-vehicle,.dashboard-recent-time{font-size:150%!important}' })
+  await expectOverviewLayout(page)
   await expectRecentLayout(page)
   expect(browserErrors).toEqual([])
 })

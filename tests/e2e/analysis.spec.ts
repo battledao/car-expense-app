@@ -77,7 +77,7 @@ test('moves the twelve-month vehicle energy summary from home into analysis and 
 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: '车辆与能耗摘要' })).toHaveCount(0)
-  await expect(page.locator('.metric').filter({ hasText: '当前里程' })).toContainText('1500 km')
+  await expect(page.locator('.dashboard-overview-stat').filter({ hasText: '当前里程' })).toContainText('1500 km')
 
   await page.goto('/analysis?range=custom&start=2026-01-01&end=2026-01-31&category=parking')
   const energyCard = page.getByRole('link', { name: /能耗分析/ })

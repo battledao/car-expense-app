@@ -152,7 +152,7 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .app-shell .panel { padding: 18px; border-radius: 16px; }
 }
 
-/* Dashboard composition follows the approved home reference: one clear monthly hero, then trend and records. */
+/* Dashboard composition follows the approved home reference: one unified monthly overview, then records. */
 .dashboard-page { padding-top: 28px; }
 .dashboard-page .dashboard-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
 .dashboard-page .dashboard-heading h2 { margin: 0; font-size: 27px; letter-spacing: -.045em; }
@@ -161,15 +161,18 @@ body { background: var(--ui-bg); color: var(--ui-text); }
 .dashboard-page .toolbar label { display: flex; align-items: center; gap: 7px; color: var(--ui-muted); font-size: 13px; }
 .dashboard-page .toolbar input { min-height: 40px; border: 1px solid var(--ui-line); border-radius: 10px; background: var(--ui-surface); }
 .dashboard-page .toolbar > a, .dashboard-page .toolbar > button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 12px; border: 1px solid var(--ui-line); border-radius: 11px; color: var(--ui-text); background: var(--ui-surface); font-weight: 700; text-decoration: none; }
-.dashboard-page .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 13px; margin-top: 20px; }
-.dashboard-page .metrics .metric:first-child { position: relative; grid-column: span 3; min-height: 220px; overflow: hidden; padding: 32px; border-color: #cde7e5; background: linear-gradient(112deg, #fff 14%, #f0fbfa 100%); }
-.dashboard-page .metrics .metric:first-child::after { position: absolute; right: -2px; bottom: -12px; width: 61%; height: 72%; background: url('./assets/dashboard-car-city.webp') no-repeat right bottom / contain; content: ''; opacity: .72; pointer-events: none; }
-.dashboard-page .metrics .metric:first-child > * { position: relative; z-index: 1; }
-.dashboard-page .metrics .metric:first-child span, .dashboard-page .metrics .metric:first-child p { color: var(--ui-muted); font-size: 17px; }
-.dashboard-page .metrics .metric:first-child strong { display: block; margin-top: 13px; color: var(--ui-teal-strong); font-size: clamp(38px, 5vw, 64px); letter-spacing: -.06em; line-height: 1; }
-.dashboard-page .metrics .metric:not(:first-child) { min-height: 104px; }
-.dashboard-page .metrics .metric:not(:first-child) strong { margin-top: 9px; font-size: 23px; }
-.dashboard-page > .muted { margin: 10px 0 24px; color: var(--ui-muted); }
+.dashboard-overview { overflow: hidden; margin: 20px 0 24px; padding: 0; border: 1px solid #cde7e5; border-radius: 18px; background: var(--ui-surface); box-shadow: var(--ui-shadow); }
+.dashboard-overview-hero { position: relative; min-height: 220px; overflow: hidden; padding: 32px; background: linear-gradient(112deg, #fff 14%, #f0fbfa 100%); }
+.dashboard-overview-hero::after { position: absolute; right: -2px; bottom: -12px; width: 61%; height: 72%; background: url('./assets/dashboard-car-city.webp') no-repeat right bottom / contain; content: ''; opacity: .72; pointer-events: none; }
+.dashboard-overview-hero > * { position: relative; z-index: 1; }
+.dashboard-overview-hero > span { color: var(--ui-muted); font-size: 17px; }
+.dashboard-overview-hero > strong { display: block; width: fit-content; max-width: 100%; margin-top: 13px; color: var(--ui-teal-strong); font-size: clamp(38px, 5vw, 64px); letter-spacing: -.06em; line-height: 1; overflow-wrap: anywhere; }
+.dashboard-overview-change { width: fit-content; max-width: 100%; margin: 18px 0 0; color: var(--ui-muted); font-size: 14px; }
+.dashboard-overview-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--ui-line); }
+.dashboard-overview-stat { min-width: 0; padding: 20px 22px; }
+.dashboard-overview-stat + .dashboard-overview-stat { border-left: 1px solid var(--ui-line); }
+.dashboard-overview-stat span { display: block; color: var(--ui-muted); font-size: 13px; line-height: 1.35; }
+.dashboard-overview-stat strong { display: block; margin-top: 9px; color: var(--ui-text); font-size: 23px; line-height: 1.2; overflow-wrap: anywhere; }
 .dashboard-page .grid-two { gap: 18px; margin-top: 18px; }
 .dashboard-page .grid-two > .panel:only-child { grid-column: 1 / -1; }
 .dashboard-page .panel > h3, .dashboard-page .panel > header h3 { color: var(--ui-text); font-size: 19px; }
@@ -215,12 +218,12 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .dashboard-page .toolbar label { flex: 1 1 100%; }
   .dashboard-page .toolbar input { flex: 1; min-width: 0; }
   .dashboard-page .toolbar > a, .dashboard-page .toolbar > button { flex: 1 1 0; }
-  .dashboard-page .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .dashboard-page .metrics .metric:first-child { grid-column: 1 / -1; min-height: 194px; padding: 26px 22px; }
-  .dashboard-page .metrics .metric:first-child::after { width: 67%; height: 67%; opacity: .6; }
-  .dashboard-page .metrics .metric:first-child strong { font-size: 49px; }
-  .dashboard-page .metrics .metric:not(:first-child) { min-height: 89px; padding: 15px; }
-  .dashboard-page .metrics .metric:not(:first-child) strong { font-size: 20px; }
+  .dashboard-overview-hero { min-height: 194px; padding: 26px 22px; }
+  .dashboard-overview-hero::after { width: 67%; height: 67%; opacity: .6; }
+  .dashboard-overview-hero > strong { font-size: clamp(38px, 12.5vw, 49px); }
+  .dashboard-overview-stat { padding: 15px 10px; }
+  .dashboard-overview-stat span { font-size: 12px; }
+  .dashboard-overview-stat strong { margin-top: 7px; font-size: clamp(16px, 4.8vw, 20px); letter-spacing: -.04em; }
   .dashboard-page .grid-two { grid-template-columns: 1fr; gap: 12px; }
 }
 
@@ -228,8 +231,6 @@ body { background: var(--ui-bg); color: var(--ui-text); }
   .app-shell main { padding-right: 24px; padding-left: 24px; }
   .app-shell .global-header select { width: min(160px, 30vw); }
   .app-shell .save-indicator { display: none; }
-  .dashboard-page .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dashboard-page .metrics .metric:first-child { grid-column: 1 / -1; }
   .dashboard-page .grid-two { grid-template-columns: 1fr; }
 }
 

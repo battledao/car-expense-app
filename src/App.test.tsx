@@ -443,7 +443,7 @@ it('keeps calendar detail open on delete failure and restores focus after closin
   expect(remove).toHaveBeenCalledWith('calendar-focus-record')
 })
 
-it('shows month-aware dashboard metrics for one vehicle and active vehicle count for all vehicles', async () => {
+it('shows one V1.23 expense overview with the correct vehicle-specific and all-vehicle metrics', async () => {
   await db.saveVehicle({ id: 'v1', name: '首页测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
   await db.saveVehicle({ id: 'v2', name: '第二辆车', energyType: 'electric', initialMileage: 0 })
   await db.saveRecord({ id: 'one', vehicleId: 'v1', category: 'parking', amountCents: 2000, occurredAt: '2026-08-02T10:00', mileage: 100, excludedFromEnergy: false, createdAt: '', updatedAt: '' })
@@ -457,12 +457,20 @@ it('shows month-aware dashboard metrics for one vehicle and active vehicle count
   expect(screen.getByRole('button', { name: '记一笔' })).toBeInTheDocument()
   expect(screen.getByLabelText('当前车辆')).toHaveDisplayValue('首页测试车')
   expect(screen.queryByText('首页测试车 · 2026-08')).not.toBeInTheDocument()
-  expect(screen.getByText('本月费用').closest('.metric')).toHaveTextContent('¥70.00')
-  expect(screen.getByText('本月记录').closest('.metric')).toHaveTextContent('2 笔')
-  expect(screen.getByText('单公里成本').closest('.metric')).toHaveTextContent('¥0.70/km')
+  const overview = screen.getByRole('region', { name: '费用概览' })
+  expect(overview).toHaveTextContent('本月费用¥70.00')
+  expect(overview).toHaveTextContent('较上月：数据不足')
+  expect(within(overview).getByText('本月记录').closest('.dashboard-overview-stat')).toHaveTextContent('2 笔')
+  expect(within(overview).getByText('当前里程').closest('.dashboard-overview-stat')).toHaveTextContent('200 km')
+  expect(within(overview).getByText('平均每笔费用').closest('.dashboard-overview-stat')).toHaveTextContent('¥35.00')
+  expect(overview.querySelectorAll('.dashboard-overview-stat')).toHaveLength(3)
+  expect(within(overview).queryByText('单公里成本')).not.toBeInTheDocument()
+  expect(overview.querySelector('.metric')).not.toBeInTheDocument()
 
   fireEvent.change(screen.getByLabelText('当前车辆'), { target: { value: 'all' } })
-  await waitFor(() => expect(screen.getByText('活跃车辆').closest('.metric')).toHaveTextContent('2 辆'))
+  await waitFor(() => expect(within(overview).getByText('活跃车辆').closest('.dashboard-overview-stat')).toHaveTextContent('2 辆'))
+  expect(within(overview).queryByText('当前里程')).not.toBeInTheDocument()
+  expect(overview.querySelectorAll('.dashboard-overview-stat')).toHaveLength(3)
 })
 it('only shows dashboard reminders when the user can take action', async () => {
   await db.saveVehicle({ id: 'v1', name: '提醒测试车', energyType: 'fuel', initialMileage: 0, isDefault: true })
@@ -866,7 +874,7 @@ it('keeps current mileage but removes the vehicle energy summary from the dashbo
   render(<MemoryRouter><App /></MemoryRouter>)
 
   fireEvent.change(await screen.findByLabelText('首页月份'), { target: { value: '2026-08' } })
-  expect(screen.getByText('当前里程').closest('.metric')).toHaveTextContent('1500 km')
+  expect(screen.getByText('当前里程').closest('.dashboard-overview-stat')).toHaveTextContent('1500 km')
   expect(screen.queryByRole('heading', { name: '车辆与能耗摘要' })).not.toBeInTheDocument()
   expect(screen.queryByText('平均油耗：8.00 L/100km')).not.toBeInTheDocument()
   expect(screen.queryByRole('link', { name: '查看能耗详情' })).not.toBeInTheDocument()
@@ -1024,6 +1032,11 @@ it('shows an actionable dashboard recent-record empty state without a useless vi
   expect(within(panel).queryByRole('link', { name: /查看全部/ })).not.toBeInTheDocument()
   expect(within(panel).queryByRole('list')).not.toBeInTheDocument()
   expect(screen.queryByText('本月费用构成')).not.toBeInTheDocument()
+  const overview = screen.getByRole('region', { name: '费用概览' })
+  expect(overview).toHaveTextContent('¥0.00')
+  expect(within(overview).getByText('本月记录').closest('.dashboard-overview-stat')).toHaveTextContent('0 笔')
+  expect(within(overview).getByText('平均每笔费用').closest('.dashboard-overview-stat')).toHaveTextContent('数据不足')
+  expect(within(overview).getByText('当前里程').closest('.dashboard-overview-stat')).toHaveTextContent('0 km')
 })
 
 it('shows a first-use dashboard action when there are no vehicles', () => {
@@ -1031,6 +1044,7 @@ it('shows a first-use dashboard action when there are no vehicles', () => {
   expect(screen.getByText('先添加一辆车，开始记录用车费用。')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: '新增第一辆车' })).toHaveAttribute('href', '/vehicles')
   expect(screen.queryByText('本月费用构成')).not.toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: '费用概览' })).not.toBeInTheDocument()
 })
 
 it('groups record scenes by vehicle type and shows the current mileage as a reference', async () => {

@@ -3,7 +3,7 @@ import { Component, type FormEvent, useEffect, useMemo, useRef, useState } from 
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, CalendarBlank, CaretLeft, CaretRight, Car, ChartPieSlice, ClipboardText, Database, DotsNine, GasPump, House, Lightning, ListBullets, NotePencil, Plus, Wrench } from '@phosphor-icons/react'
-import { analysisCategories, analysisCostPerKm, analysisDateRange, analysisMonths, analysisSummary, analysisTrend, analysisVehicles, averageEnergy, energyDateRange, energyIntervals, energyQuality, energySummary, energyUnavailableReason, energyUnitPriceCents, filterEnergyIntervals, filterRecords, highestMileage, hybridEnergyCost, monthSummary, monthlyCostPerKm, totalCents, vehicleEnergySummary, vehiclesWithEnergyData, type AnalysisRangePreset, type EnergyInterval, type EnergyRangePreset, type RecordFilters } from './calculations'
+import { analysisCategories, analysisCostPerKm, analysisDateRange, analysisMonths, analysisSummary, analysisTrend, analysisVehicles, averageEnergy, energyDateRange, energyIntervals, energyQuality, energySummary, energyUnavailableReason, energyUnitPriceCents, filterEnergyIntervals, filterRecords, highestMileage, hybridEnergyCost, monthSummary, totalCents, vehicleEnergySummary, vehiclesWithEnergyData, type AnalysisRangePreset, type EnergyInterval, type EnergyRangePreset, type RecordFilters } from './calculations'
 import { categories, categoryLabels, energyLabels, formatDate, formatMoney, localNow } from './constants'
 import { availableCategories, categoryIcons, fieldsForCategory, isCategoryAvailable, isEnergyCategory, reconcileEnergyValues } from './recordForm'
 import { db } from './db'
@@ -43,7 +43,6 @@ function Dashboard({ data }: { data: Data }) {
   const records = scoped(data)
   const selected = current(data)
   const summary = monthSummary(records, selectedMonth)
-  const perKm = selected ? monthlyCostPerKm(records, selectedMonth) : undefined
   const end = endOfMonth(selectedMonth)
   const monthly = records.filter(record => record.occurredAt.startsWith(selectedMonth))
   const recent = [...records].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt) || left.id.localeCompare(right.id)).slice(0, 5)
@@ -113,8 +112,14 @@ function Dashboard({ data }: { data: Data }) {
 
   return <section className="dashboard-page">
     <div className="dashboard-heading"><h2>首页总览</h2><div className="toolbar"><label>统计月份<input aria-label="首页月份" type="month" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} /></label><button onClick={() => setSelectedMonth(month())}>本月</button><Link to={recordLink()}>查看本月记录</Link></div></div>
-    <div className="metrics">{selected ? <><Metric label="本月费用" value={formatMoney(summary.totalCents)} /><Metric label="本月记录" value={`${summary.count} 笔`} /><Metric label="平均每笔费用" value={summary.averageCents === undefined ? '数据不足' : formatMoney(summary.averageCents)} /><Metric label="当前里程" value={`${highestMileage(selected, records)} km`} /><Metric label="单公里成本" value={perKm?.costPerKm === undefined ? perKm?.reason ?? '数据不足' : `${formatMoney(perKm.costPerKm)}/km`} /></> : <><Metric label="本月总费用" value={formatMoney(summary.totalCents)} /><Metric label="本月记录" value={`${summary.count} 笔`} /><Metric label="平均每笔费用" value={summary.averageCents === undefined ? '数据不足' : formatMoney(summary.averageCents)} /><Metric label="活跃车辆" value={`${data.vehicles.length} 辆`} /></>}</div>
-    <p className="muted">较上月：{summary.changePercent === undefined ? '数据不足' : `${summary.changePercent >= 0 ? '+' : ''}${summary.changePercent.toFixed(1)}%`}</p>
+    <section className="dashboard-overview" aria-label="费用概览">
+      <div className="dashboard-overview-hero"><span>本月费用</span><strong>{formatMoney(summary.totalCents)}</strong><p className="dashboard-overview-change">较上月：{summary.changePercent === undefined ? '数据不足' : `${summary.changePercent >= 0 ? '+' : ''}${summary.changePercent.toFixed(1)}%`}</p></div>
+      <div className="dashboard-overview-stats">
+        <div className="dashboard-overview-stat"><span>本月记录</span><strong>{summary.count} 笔</strong></div>
+        {selected ? <div className="dashboard-overview-stat"><span>当前里程</span><strong>{highestMileage(selected, records)} km</strong></div> : <div className="dashboard-overview-stat"><span>活跃车辆</span><strong>{data.vehicles.length} 辆</strong></div>}
+        <div className="dashboard-overview-stat"><span>平均每笔费用</span><strong>{summary.averageCents === undefined ? '数据不足' : formatMoney(summary.averageCents)}</strong></div>
+      </div>
+    </section>
     <div className="grid-two">
       <section className="panel dashboard-recent">
         <header className="dashboard-recent-heading"><h3 ref={recentHeadingRef} tabIndex={-1}>最近记录</h3>{recent.length > 0 && <Link to={recentRecordsUrl}>查看全部<CaretRight aria-hidden="true" size={18} /></Link>}</header>
